@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
@@ -10,4 +5,169 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+enum UserRole {
+  STUDENT
+  FACULTY
+  TECHNICIAN
+  ADMIN
+}
+
+enum TicketStatus {
+  OPEN
+  CLAIMED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum CategorySource {
+  USER_SELECTED
+  AI_SUGGESTED
+  TECHNICIAN_OVERRIDE
+}
+
+model User {
+  id                  String             @id @default(uuid()) @db.Uuid
+  email               String             @unique
+  microsoftTenantId   String?            @db.Uuid
+  microsoftObjectId   String?            @db.Uuid
+  displayName         String
+  role                UserRole
+  isActive            Boolean            @default(true)
+  createdAt           DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime           @updatedAt @db.Timestamptz(3)
+  createdTickets      Ticket[]           @relation("TicketCreator")
+  assignedTickets     Ticket[]           @relation("CurrentTechnician")
+  comments            Comment[]
+  assignments         TicketAssignment[] @relation("AssignedTechnician")
+  madeAssignments     TicketAssignment[] @relation("AssignmentActor")
+  uploadedAttachments Attachment[]
+  activities          TicketActivity[]
+
+  @@unique([microsoftTenantId, microsoftObjectId])
+  @@index([role, isActive])
+  @@map("users")
+}
+
+model Category {
+  id                 String   @id @default(uuid()) @db.Uuid
+  name               String   @unique
+  description        String?
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime @updatedAt @db.Timestamptz(3)
+  tickets            Ticket[] @relation("TicketCategory")
+  aiSuggestedTickets Ticket[] @relation("AiSuggestedCategory")
+
+  @@index([isActive, name])
+  @@map("categories")
+}
+
+model Ticket {
+  id                    String             @id @default(uuid()) @db.Uuid
+  ticketNumber          String             @unique @default(dbgenerated("'HD-' || lpad(nextval('ticket_number_seq')::text, 6, '0')"))
+  creatorId             String             @db.Uuid
+  title                 String
+  description           String
+  categoryId            String             @db.Uuid
+  categorySource        CategorySource
+  priority              TicketPriority     @default(MEDIUM)
+  status                TicketStatus       @default(OPEN)
+  location              String?
+  assignedTechnicianId  String?            @db.Uuid
+  aiSuggestedCategoryId String?            @db.Uuid
+  aiSuggestedPriority   TicketPriority?
+  aiSummary             String?
+  resolvedAt            DateTime?          @db.Timestamptz(3)
+  closedAt              DateTime?          @db.Timestamptz(3)
+  cancelledAt           DateTime?          @db.Timestamptz(3)
+  createdAt             DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime           @updatedAt @db.Timestamptz(3)
+  creator               User               @relation("TicketCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  category              Category           @relation("TicketCategory", fields: [categoryId], references: [id], onDelete: Restrict)
+  assignedTechnician    User?              @relation("CurrentTechnician", fields: [assignedTechnicianId], references: [id], onDelete: SetNull)
+  aiSuggestedCategory   Category?          @relation("AiSuggestedCategory", fields: [aiSuggestedCategoryId], references: [id], onDelete: SetNull)
+  comments              Comment[]
+  assignments           TicketAssignment[]
+  attachments           Attachment[]
+  activities            TicketActivity[]
+
+  @@index([creatorId, createdAt(sort: Desc)])
+  @@index([status, priority, createdAt(sort: Desc)])
+  @@index([categoryId, status])
+  @@index([assignedTechnicianId, status])
+  @@map("tickets")
+}
+
+model Comment {
+  id         String   @id @default(uuid()) @db.Uuid
+  ticketId   String   @db.Uuid
+  authorId   String   @db.Uuid
+  body       String
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author     User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt])
+  @@map("comments")
+}
+
+model TicketAssignment {
+  id           String    @id @default(uuid()) @db.Uuid
+  ticketId     String    @db.Uuid
+  technicianId String    @db.Uuid
+  assignedById String?   @db.Uuid
+  assignedAt   DateTime  @default(now()) @db.Timestamptz(3)
+  unassignedAt DateTime? @db.Timestamptz(3)
+  ticket       Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  technician   User      @relation("AssignedTechnician", fields: [technicianId], references: [id], onDelete: Restrict)
+  assignedBy   User?     @relation("AssignmentActor", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, assignedAt(sort: Desc)])
+  @@index([technicianId, unassignedAt])
+  @@map("ticket_assignments")
+}
+
+model Attachment {
+  id           String   @id @default(uuid()) @db.Uuid
+  ticketId     String   @db.Uuid
+  uploadedById String   @db.Uuid
+  fileName     String
+  storagePath  String   @unique
+  mimeType     String
+  sizeBytes    BigInt
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  ticket       Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt])
+  @@map("attachments")
+}
+
+model TicketActivity {
+  id        String   @id @default(uuid()) @db.Uuid
+  ticketId  String   @db.Uuid
+  actorId   String?  @db.Uuid
+  type      String
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@index([type, createdAt])
+  @@map("ticket_activities")
 }
