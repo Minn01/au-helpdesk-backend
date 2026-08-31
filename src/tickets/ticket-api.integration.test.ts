@@ -85,6 +85,7 @@ const technicianTickets = {
 const start = async () => {
   const server = await new Promise<Server>((resolve) => {
     const candidate = createApp({
+      attachments: {} as never,
       users,
       sessions: createSessionService(secret),
       categories: { listActive: async () => [] },

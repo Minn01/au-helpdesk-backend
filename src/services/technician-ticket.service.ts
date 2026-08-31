@@ -8,6 +8,7 @@ import {
 } from "../../generated/prisma/client.js";
 import { HttpError } from "../errors/http-error.js";
 import type { MineFilters } from "./ticket.service.js";
+import { attachmentSelect } from "./attachment-select.js";
 
 const userSelect = { id: true, displayName: true, role: true } as const;
 const categorySelect = { id: true, name: true, description: true } as const;
@@ -35,7 +36,7 @@ const detailInclude = {
   creator: { select: userSelect },
   assignedTechnician: { select: userSelect },
   comments: { orderBy: { createdAt: "asc" as const }, include: { author: { select: userSelect } } },
-  attachments: { orderBy: { createdAt: "asc" as const }, include: { uploadedBy: { select: userSelect } } },
+  attachments: { orderBy: { createdAt: "asc" as const }, select: attachmentSelect },
   assignments: {
     orderBy: { assignedAt: "asc" as const },
     include: {

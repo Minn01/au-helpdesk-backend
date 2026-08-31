@@ -3,8 +3,12 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, describe, it } from "node:test";
 import { UserRole } from "../../generated/prisma/client.js";
-import { prisma } from "../lib/prisma.js";
+import { createPrismaClient } from "../lib/prisma.js";
 import { PrismaMicrosoftUserProvisioner } from "./microsoft-auth.service.js";
+
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) throw new Error("DATABASE_URL is required for database integration tests");
+const prisma = createPrismaClient(connectionString);
 
 const createdIds: string[] = [];
 const provisioner = new PrismaMicrosoftUserProvisioner(prisma);

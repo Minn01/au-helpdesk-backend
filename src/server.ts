@@ -1,12 +1,14 @@
 import "dotenv/config";
 import { createDefaultApp } from "./bootstrap.js";
-import { env } from "./config/env.js";
+import { loadConfiguration } from "./config/env.js";
 import { logger } from "./lib/logger.js";
 
-const server = createDefaultApp().listen(env.port, () => {
+const config = await loadConfiguration();
+const server = createDefaultApp(config).listen(config.port, () => {
   logger.info("AU HelpDesk API started", {
-    environment: env.nodeEnv,
-    port: env.port,
+    environment: config.nodeEnv,
+    port: config.port,
+    secretSource: config.secretSource,
   });
 });
 

@@ -43,6 +43,7 @@ describe("Microsoft application authentication", () => {
   before(async () => {
     server = await new Promise<Server>((resolve) => {
       const candidate = createApp({
+        attachments: {} as never,
         users: { findById: async (id) => id === activeUser.id ? activeUser : null },
         sessions,
         categories: { listActive: async () => [] },

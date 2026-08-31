@@ -1,9 +1,9 @@
-import { prisma } from "../lib/prisma.js";
+import type { PrismaClient } from "../../generated/prisma/client.js";
 import type { UserRepository } from "./auth.types.js";
 
-export const userRepository: UserRepository = {
+export const createUserRepository = (database: PrismaClient): UserRepository => ({
   findById: (id) =>
-    prisma.user.findUnique({
+    database.user.findUnique({
       where: { id },
       select: {
         id: true,
@@ -13,4 +13,4 @@ export const userRepository: UserRepository = {
         isActive: true,
       },
     }),
-};
+});

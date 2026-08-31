@@ -1,30 +1,42 @@
 import "dotenv/config";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { CategorySource, PrismaClient, TicketPriority, TicketStatus } from "../../generated/prisma/client.js";
+import { CategorySource, PrismaClient, TicketPriority, TicketStatus, UserRole } from "../../generated/prisma/client.js";
 import { HttpError } from "../errors/http-error.js";
-import { prisma } from "../lib/prisma.js";
+import { createPrismaClient } from "../lib/prisma.js";
 import { TechnicianTicketService } from "../services/technician-ticket.service.js";
 
-const studentId = "10000000-0000-4000-8000-000000000001";
-const technicianIds = [
-  "10000000-0000-4000-8000-000000000004",
-  "10000000-0000-4000-8000-000000000005",
-] as const;
+const studentId = randomUUID();
+const technicianIds = [randomUUID(), randomUUID()] as const;
 let ticketId: string | undefined;
 let otherCategoryId: string | undefined;
+let overrideCategoryId: string | undefined;
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required for database integration tests");
+const prisma = createPrismaClient(connectionString);
 const competitorOne = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 const competitorTwo = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
 describe("concurrent technician claiming", () => {
   before(async () => {
-    const category = await prisma.category.findFirstOrThrow({
-      where: { name: "Other", isActive: true },
+    await prisma.user.createMany({
+      data: [
+        { id: studentId, email: `claim-test-student-${studentId}@au.edu`, displayName: "Claim Test Student", role: UserRole.STUDENT },
+        { id: technicianIds[0], email: `claim-test-tech1-${technicianIds[0]}@au.edu`, displayName: "Claim Test Technician One", role: UserRole.TECHNICIAN },
+        { id: technicianIds[1], email: `claim-test-tech2-${technicianIds[1]}@au.edu`, displayName: "Claim Test Technician Two", role: UserRole.TECHNICIAN },
+      ],
+    });
+    const category = await prisma.category.create({
+      data: { name: `Claim test initial ${randomUUID()}` },
       select: { id: true },
     });
+    const overrideCategory = await prisma.category.create({
+      data: { name: `Claim test override ${randomUUID()}` },
+      select: { id: true },
+    });
+    overrideCategoryId = overrideCategory.id;
     const ticket = await prisma.ticket.create({
       data: {
         creatorId: studentId,
@@ -47,6 +59,8 @@ describe("concurrent technician claiming", () => {
 
   after(async () => {
     if (ticketId) await prisma.ticket.deleteMany({ where: { id: ticketId } });
+    await prisma.category.deleteMany({ where: { id: { in: [otherCategoryId, overrideCategoryId].filter((id): id is string => Boolean(id)) } } });
+    await prisma.user.deleteMany({ where: { id: { in: [studentId, ...technicianIds] } } });
     await competitorOne.$disconnect();
     await competitorTwo.$disconnect();
     await prisma.$disconnect();
@@ -88,15 +102,12 @@ describe("concurrent technician claiming", () => {
     const started = await service.start(ticketId, winnerId);
     assert.equal(started.status, TicketStatus.IN_PROGRESS);
 
-    const network = await prisma.category.findFirstOrThrow({
-      where: { name: "Network", isActive: true },
-      select: { id: true },
-    });
+    assert.ok(overrideCategoryId);
     const classified = await service.updateClassification(ticketId, winnerId, {
-      categoryId: network.id,
+      categoryId: overrideCategoryId,
       priority: TicketPriority.HIGH,
     });
-    assert.equal(classified.categoryId, network.id);
+    assert.equal(classified.categoryId, overrideCategoryId);
     assert.equal(classified.priority, TicketPriority.HIGH);
     assert.equal(classified.categorySource, CategorySource.TECHNICIAN_OVERRIDE);
     assert.equal(classified.aiSuggestedCategoryId, otherCategoryId);

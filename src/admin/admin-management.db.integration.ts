@@ -4,18 +4,23 @@ import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { CategorySource, TicketPriority, TicketStatus, UserRole } from "../../generated/prisma/client.js";
 import { HttpError } from "../errors/http-error.js";
-import { prisma } from "../lib/prisma.js";
+import { createPrismaClient } from "../lib/prisma.js";
 import { AdminManagementService } from "../services/admin-management.service.js";
 import { AdminTicketService } from "../services/admin-ticket.service.js";
 
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) throw new Error("DATABASE_URL is required for database integration tests");
+const prisma = createPrismaClient(connectionString);
+
 const ids = {
-  student: "10000000-0000-4000-8000-000000000001",
-  admin: "10000000-0000-4000-8000-000000000003",
-  technicianOne: "10000000-0000-4000-8000-000000000004",
-  technicianTwo: "10000000-0000-4000-8000-000000000005",
+  student: randomUUID(),
+  admin: randomUUID(),
+  technicianOne: randomUUID(),
+  technicianTwo: randomUUID(),
 };
 const temporaryUserId = randomUUID();
 let ticketId: string | undefined;
+let fixtureCategoryId: string | undefined;
 let categoryId: string | undefined;
 let categoryName: string | undefined;
 
@@ -24,7 +29,20 @@ describe("admin management database behavior", () => {
   const tickets = new AdminTicketService(prisma);
 
   before(async () => {
-    const category = await prisma.category.findFirstOrThrow({ where: { name: "Other" }, select: { id: true } });
+    await prisma.user.createMany({
+      data: [
+        { id: ids.student, email: `admin-test-student-${ids.student}@au.edu`, displayName: "Admin Test Student", role: UserRole.STUDENT },
+        { id: ids.admin, email: `admin-test-admin-${ids.admin}@au.edu`, displayName: "Admin Test Admin", role: UserRole.ADMIN },
+        { id: ids.technicianOne, email: `admin-test-tech1-${ids.technicianOne}@au.edu`, displayName: "Admin Test Technician One", role: UserRole.TECHNICIAN },
+        { id: ids.technicianTwo, email: `admin-test-tech2-${ids.technicianTwo}@au.edu`, displayName: "Admin Test Technician Two", role: UserRole.TECHNICIAN },
+        { id: temporaryUserId, email: `admin-test-temporary-${temporaryUserId}@au.edu`, displayName: "Admin Test Temporary User", role: UserRole.STUDENT },
+      ],
+    });
+    const category = await prisma.category.create({
+      data: { name: `Admin test fixture ${randomUUID()}`, description: "Isolated integration-test category" },
+      select: { id: true },
+    });
+    fixtureCategoryId = category.id;
     const ticket = await prisma.ticket.create({
       data: {
         creatorId: ids.student,
@@ -38,14 +56,6 @@ describe("admin management database behavior", () => {
       select: { id: true },
     });
     ticketId = ticket.id;
-    await prisma.user.create({
-      data: {
-        id: temporaryUserId,
-        email: `phase6-${temporaryUserId}@au.edu`,
-        displayName: "Phase 6 Temporary User",
-        role: UserRole.STUDENT,
-      },
-    });
   });
 
   after(async () => {
@@ -55,7 +65,8 @@ describe("admin management database behavior", () => {
     } else if (categoryId) {
       await prisma.category.deleteMany({ where: { id: categoryId } });
     }
-    await prisma.user.deleteMany({ where: { id: temporaryUserId } });
+    if (fixtureCategoryId) await prisma.category.deleteMany({ where: { id: fixtureCategoryId } });
+    await prisma.user.deleteMany({ where: { id: { in: [...Object.values(ids), temporaryUserId] } } });
     await prisma.$disconnect();
   });
 
@@ -89,8 +100,10 @@ describe("admin management database behavior", () => {
   });
 
   it("updates internal roles but protects an administrator from self-lockout", async () => {
-    const updated = await management.updateUser(temporaryUserId, { role: UserRole.FACULTY }, ids.admin);
-    assert.equal(updated.role, UserRole.FACULTY);
+    for (const role of [UserRole.FACULTY, UserRole.TECHNICIAN, UserRole.ADMIN]) {
+      const updated = await management.updateUser(temporaryUserId, { role }, ids.admin);
+      assert.equal(updated.role, role);
+    }
     await assert.rejects(
       management.updateUser(ids.admin, { isActive: false }, ids.admin),
       (error) => error instanceof HttpError && error.status === 409 && error.code === "SELF_LOCKOUT_PROTECTED",

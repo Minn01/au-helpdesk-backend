@@ -34,6 +34,11 @@ enum CategorySource {
   USER_SELECTED
   AI_SUGGESTED
   TECHNICIAN_OVERRIDE
+  PEER_INTEGRATION
+}
+
+enum PeerSourceSystem {
+  EDUCORE
 }
 
 model User {
@@ -74,33 +79,34 @@ model Category {
 }
 
 model Ticket {
-  id                    String             @id @default(uuid()) @db.Uuid
-  ticketNumber          String             @unique @default(dbgenerated("'HD-' || lpad(nextval('ticket_number_seq')::text, 6, '0')"))
-  creatorId             String             @db.Uuid
+  id                    String                @id @default(uuid()) @db.Uuid
+  ticketNumber          String                @unique @default(dbgenerated("'HD-' || lpad(nextval('ticket_number_seq')::text, 6, '0')"))
+  creatorId             String                @db.Uuid
   title                 String
   description           String
-  categoryId            String             @db.Uuid
+  categoryId            String                @db.Uuid
   categorySource        CategorySource
-  priority              TicketPriority     @default(MEDIUM)
-  status                TicketStatus       @default(OPEN)
+  priority              TicketPriority        @default(MEDIUM)
+  status                TicketStatus          @default(OPEN)
   location              String?
-  assignedTechnicianId  String?            @db.Uuid
-  aiSuggestedCategoryId String?            @db.Uuid
+  assignedTechnicianId  String?               @db.Uuid
+  aiSuggestedCategoryId String?               @db.Uuid
   aiSuggestedPriority   TicketPriority?
   aiSummary             String?
-  resolvedAt            DateTime?          @db.Timestamptz(3)
-  closedAt              DateTime?          @db.Timestamptz(3)
-  cancelledAt           DateTime?          @db.Timestamptz(3)
-  createdAt             DateTime           @default(now()) @db.Timestamptz(3)
-  updatedAt             DateTime           @updatedAt @db.Timestamptz(3)
-  creator               User               @relation("TicketCreator", fields: [creatorId], references: [id], onDelete: Restrict)
-  category              Category           @relation("TicketCategory", fields: [categoryId], references: [id], onDelete: Restrict)
-  assignedTechnician    User?              @relation("CurrentTechnician", fields: [assignedTechnicianId], references: [id], onDelete: SetNull)
-  aiSuggestedCategory   Category?          @relation("AiSuggestedCategory", fields: [aiSuggestedCategoryId], references: [id], onDelete: SetNull)
+  resolvedAt            DateTime?             @db.Timestamptz(3)
+  closedAt              DateTime?             @db.Timestamptz(3)
+  cancelledAt           DateTime?             @db.Timestamptz(3)
+  createdAt             DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime              @updatedAt @db.Timestamptz(3)
+  creator               User                  @relation("TicketCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  category              Category              @relation("TicketCategory", fields: [categoryId], references: [id], onDelete: Restrict)
+  assignedTechnician    User?                 @relation("CurrentTechnician", fields: [assignedTechnicianId], references: [id], onDelete: SetNull)
+  aiSuggestedCategory   Category?             @relation("AiSuggestedCategory", fields: [aiSuggestedCategoryId], references: [id], onDelete: SetNull)
   comments              Comment[]
   assignments           TicketAssignment[]
   attachments           Attachment[]
   activities            TicketActivity[]
+  peerReferences        PeerTicketReference[]
 
   @@index([creatorId, createdAt(sort: Desc)])
   @@index([status, priority, createdAt(sort: Desc)])
@@ -170,4 +176,17 @@ model TicketActivity {
   @@index([ticketId, createdAt])
   @@index([type, createdAt])
   @@map("ticket_activities")
+}
+
+model PeerTicketReference {
+  id              String           @id @default(uuid()) @db.Uuid
+  ticketId        String           @db.Uuid
+  sourceSystem    PeerSourceSystem
+  externalEventId String
+  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
+  ticket          Ticket           @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceSystem, externalEventId])
+  @@index([ticketId])
+  @@map("peer_ticket_references")
 }

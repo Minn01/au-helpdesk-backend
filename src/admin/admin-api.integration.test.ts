@@ -21,6 +21,7 @@ describe("admin API authorization and validation", () => {
   before(async () => {
     server = await new Promise<Server>((resolve) => {
       const candidate = createApp({
+        attachments: {} as never,
         users,
         sessions,
         categories: { listActive: async () => [] },

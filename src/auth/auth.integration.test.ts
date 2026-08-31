@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
+import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { after, before, describe, it } from "node:test";
-import type { Server } from "node:http";
 import { UserRole } from "../../generated/prisma/client.js";
 import { createApp } from "../app.js";
 import type { AuthUser, UserRepository } from "./auth.types.js";
@@ -31,52 +31,47 @@ const unusedTechnicianTickets = {
 
 const secret = "integration-test-secret-that-is-at-least-32-characters";
 const activeStudent: AuthUser = {
-  id: "10000000-0000-4000-8000-000000000001",
-  email: "student@au.edu",
-  displayName: "Narin Chaiyasit",
+  id: "auth-test-active-user",
+  email: "active-auth-test@au.edu",
+  displayName: "Active Auth Test User",
   role: UserRole.STUDENT,
   isActive: true,
 };
 const inactiveFaculty: AuthUser = {
-  id: "10000000-0000-4000-8000-000000000099",
-  email: "inactive@au.edu",
-  displayName: "Inactive Faculty",
+  id: "auth-test-inactive-user",
+  email: "inactive-auth-test@au.edu",
+  displayName: "Inactive Auth Test User",
   role: UserRole.FACULTY,
   isActive: false,
 };
-
 const usersById = new Map([
   [activeStudent.id, activeStudent],
   [inactiveFaculty.id, inactiveFaculty],
 ]);
-
 const users: UserRepository = {
   findById: async (id) => usersById.get(id) ?? null,
 };
 
-const listen = async (nodeEnv: "development" | "production") => {
-  const server = await new Promise<Server>((resolve) => {
-    const candidate = createApp({
-      users,
-      sessions: createSessionService(secret),
-      categories: unusedCategories,
-      tickets: unusedTickets,
-      technicianTickets: unusedTechnicianTickets,
-      adminTickets: {} as never,
-      adminManagement: {} as never,
-      nodeEnv,
-    }).listen(0, "127.0.0.1", () => resolve(candidate));
-  });
-  const address = server.address() as AddressInfo;
-  return { server, baseUrl: `http://127.0.0.1:${address.port}` };
-};
-
-describe("development authentication", () => {
+describe("session authentication", () => {
   let server: Server;
   let baseUrl: string;
 
   before(async () => {
-    ({ server, baseUrl } = await listen("development"));
+    server = await new Promise<Server>((resolve) => {
+      const candidate = createApp({
+        attachments: {} as never,
+        users,
+        sessions: createSessionService(secret),
+        categories: unusedCategories,
+        tickets: unusedTickets,
+        technicianTickets: unusedTechnicianTickets,
+        adminTickets: {} as never,
+        adminManagement: {} as never,
+        nodeEnv: "development",
+      }).listen(0, "127.0.0.1", () => resolve(candidate));
+    });
+    const address = server.address() as AddressInfo;
+    baseUrl = `http://127.0.0.1:${address.port}`;
   });
 
   after(async () => {
@@ -85,23 +80,9 @@ describe("development authentication", () => {
     });
   });
 
-  it("logs in an existing active user, returns /auth/me, and logs out", async () => {
-    const login = await fetch(`${baseUrl}/api/dev/auth/login`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId: activeStudent.id, role: UserRole.ADMIN }),
-    });
-
-    assert.equal(login.status, 200);
-    assert.deepEqual(await login.json(), { user: activeStudent });
-    const setCookie = login.headers.get("set-cookie");
-    if (!setCookie) assert.fail("Login did not set a session cookie");
-    assert.ok(setCookie.includes("helpdesk_session="));
-    assert.match(setCookie, /HttpOnly/i);
-    assert.match(setCookie, /SameSite=Lax/i);
-    const cookie = setCookie.split(";", 1)[0];
-    assert.ok(cookie);
-
+  it("loads an active user from a valid HelpDesk session and logs out", async () => {
+    const token = createSessionService(secret).createToken(activeStudent.id);
+    const cookie = `helpdesk_session=${token}`;
     const me = await fetch(`${baseUrl}/api/auth/me`, { headers: { cookie } });
     assert.equal(me.status, 200);
     assert.deepEqual(await me.json(), { user: activeStudent });
@@ -112,35 +93,9 @@ describe("development authentication", () => {
     });
     assert.equal(logout.status, 204);
     assert.match(logout.headers.get("set-cookie") ?? "", /helpdesk_session=;/);
-
-    const afterLogout = await fetch(`${baseUrl}/api/auth/me`);
-    assert.equal(afterLogout.status, 401);
   });
 
-  it("returns 404 for a missing development user", async () => {
-    const response = await fetch(`${baseUrl}/api/dev/auth/login`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId: "10000000-0000-4000-8000-000000000404" }),
-    });
-    assert.equal(response.status, 404);
-    assert.deepEqual(await response.json(), {
-      error: "USER_NOT_FOUND",
-      message: "Development user not found",
-    });
-  });
-
-  it("rejects an inactive development user", async () => {
-    const response = await fetch(`${baseUrl}/api/dev/auth/login`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId: inactiveFaculty.id }),
-    });
-    assert.equal(response.status, 403);
-    assert.equal((await response.json() as { error: string }).error, "ACCOUNT_INACTIVE");
-  });
-
-  it("rejects an inactive user whose existing session is otherwise valid", async () => {
+  it("rejects an inactive user whose session is otherwise valid", async () => {
     const token = createSessionService(secret).createToken(inactiveFaculty.id);
     const response = await fetch(`${baseUrl}/api/auth/me`, {
       headers: { cookie: `helpdesk_session=${token}` },
@@ -148,22 +103,13 @@ describe("development authentication", () => {
     assert.equal(response.status, 403);
     assert.equal((await response.json() as { error: string }).error, "ACCOUNT_INACTIVE");
   });
-});
 
-describe("production route configuration", () => {
-  it("does not mount development login", async () => {
-    const { server, baseUrl } = await listen("production");
-    try {
-      const response = await fetch(`${baseUrl}/api/dev/auth/login`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ userId: activeStudent.id }),
-      });
-      assert.equal(response.status, 404);
-    } finally {
-      await new Promise<void>((resolve, reject) => {
-        server.close((error) => error ? reject(error) : resolve());
-      });
-    }
+  it("does not expose the removed development login route", async () => {
+    const response = await fetch(`${baseUrl}/api/dev/auth/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId: activeStudent.id }),
+    });
+    assert.equal(response.status, 404);
   });
 });

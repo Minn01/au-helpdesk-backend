@@ -4,7 +4,6 @@ import type { SessionService } from "./auth/session.service.js";
 import type { UserRepository } from "./auth/auth.types.js";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import { createAuthRouter } from "./routes/auth.routes.js";
-import { createDevelopmentAuthRouter } from "./routes/dev-auth.routes.js";
 import { healthRouter } from "./routes/health.routes.js";
 import { createCategoryRouter } from "./routes/category.routes.js";
 import { createTicketRouter } from "./routes/ticket.routes.js";
@@ -15,6 +14,10 @@ import type { CategoryApi } from "./services/category.service.js";
 import type { TicketApi } from "./services/ticket.service.js";
 import type { TechnicianTicketApi } from "./services/technician-ticket.service.js";
 import type { MicrosoftAuthDependencies } from "./controllers/microsoft-auth.controller.js";
+import type { AttachmentApi } from "./services/attachment.service.js";
+import type { PeerTicketApi } from "./services/peer-integrations/peer-ticket.service.js";
+import type { EduCoreContextApi } from "./services/peer-integrations/educore-context.service.js";
+import { createPeerRouter } from "./routes/peer.routes.js";
 
 export type AppDependencies = {
   users: UserRepository;
@@ -24,6 +27,8 @@ export type AppDependencies = {
   technicianTickets: TechnicianTicketApi;
   adminTickets: AdminTicketApi;
   adminManagement: AdminManagementApi;
+  attachments: AttachmentApi;
+  peer?: { apiKey: string; tickets: PeerTicketApi; context: EduCoreContextApi } | undefined;
   microsoft?: MicrosoftAuthDependencies | undefined;
   nodeEnv: "development" | "test" | "production";
 };
@@ -40,6 +45,7 @@ export const createApp = (dependencies: AppDependencies) => {
   app.use("/api/health", healthRouter);
   app.use("/api/auth", createAuthRouter(dependencies.users, dependencies.sessions, isProduction, dependencies.microsoft));
   app.use("/api/categories", createCategoryRouter(dependencies.users, dependencies.sessions, dependencies.categories));
+  if (dependencies.peer) app.use("/api/peer", createPeerRouter(dependencies.peer.apiKey, dependencies.peer.tickets));
   app.use(
     "/api/admin",
     createAdminRouter(
@@ -56,14 +62,10 @@ export const createApp = (dependencies: AppDependencies) => {
       dependencies.sessions,
       dependencies.tickets,
       dependencies.technicianTickets,
+      dependencies.attachments,
+      dependencies.peer?.context,
     ),
   );
-  if (dependencies.nodeEnv === "development") {
-    app.use(
-      "/api/dev/auth",
-      createDevelopmentAuthRouter(dependencies.users, dependencies.sessions, isProduction),
-    );
-  }
   app.use(notFoundHandler);
   app.use(errorHandler);
 

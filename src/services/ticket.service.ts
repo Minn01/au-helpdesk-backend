@@ -7,6 +7,7 @@ import {
 import { HttpError } from "../errors/http-error.js";
 import type { CreateTicketInput, UpdateTicketInput } from "../validation/ticket.validation.js";
 import type { ClassificationService } from "./classification.service.js";
+import { attachmentSelect } from "./attachment-select.js";
 
 const userSelect = { id: true, displayName: true, role: true } as const;
 const categorySelect = { id: true, name: true, description: true } as const;
@@ -39,7 +40,7 @@ const detailInclude = {
   },
   attachments: {
     orderBy: { createdAt: "asc" as const },
-    include: { uploadedBy: { select: userSelect } },
+    select: attachmentSelect,
   },
   activities: {
     orderBy: { createdAt: "asc" as const },
