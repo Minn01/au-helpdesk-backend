@@ -44,7 +44,7 @@ Express ↔ EduCore peer API
 - PostgreSQL is modeled with Prisma ORM 7, an initial SQL migration, and a development-only idempotent seed.
 - `GET /api/health` verifies the HTTP service. HttpOnly-cookie JWT sessions are exposed through `GET /api/auth/me` and `POST /api/auth/logout`; there is no seeded-user development login endpoint.
 - Phase 3 provides authenticated Student/Faculty category listing plus owner-scoped ticket, comment, and activity REST APIs. Requesters can create/list/view their tickets, edit or cancel only while `OPEN`, and comment on owned tickets; requester queries exclude internal comments.
-- Phase 5 provides Technician queue, assigned-ticket, shared detail/comment, atomic self-claim, classification override, and `CLAIMED → IN_PROGRESS → RESOLVED` REST workflows. Admin assignment and management remain deferred.
+- Phase 5 provides Technician queue, assigned-ticket, shared detail/comment, atomic self-claim, classification override, and `CLAIMED → IN_PROGRESS → RESOLVED` REST workflows. Technicians may read comments while viewing an eligible unassigned `OPEN` queue ticket, but must claim/be assigned before adding comments. Admin assignment and management remain deferred.
 - Phase 6 provides Admin dashboard statistics, all-ticket search/filter/detail, concurrency-safe assignment/reassignment with preserved history, category create/edit/disable/re-enable, and internal HelpDesk user role/status management. The separate frontend still needs to connect these Admin screens to the real APIs.
 - Phase 7 provides Microsoft Entra ID authorization-code authentication at internal `/api/auth/microsoft` and `/api/auth/microsoft/callback` routes, intended to be exposed as `/helpdesk/api/...`. It validates signed state and nonce, links immutable tenant/object identity to the internal user, and then issues the existing HelpDesk session cookie. The separate frontend still needs to connect its production sign-in button.
 - Microsoft authentication provisions a previously unknown valid tenant user as an active `STUDENT`. Elevated roles are assigned later through HelpDesk Admin user management; the first Admin currently requires a manual database role update after Microsoft login.
@@ -52,10 +52,10 @@ Express ↔ EduCore peer API
 - Ticket numbers use a PostgreSQL sequence-backed default rather than row counting.
 - Authentication reloads the internal user on each request and centrally enforces active status and reusable role checks. Microsoft login is the only user-login path; development seed identities and seeded-user login are not provided.
 - Ticket mutation and corresponding activity writes are transactional. My Tickets supports validated search/status/priority/category/sort filters and offset pagination.
-- Auto-detect uses a replaceable classification service with a deterministic `Other`/`MEDIUM` fallback until the OpenAI phase; `AUTO_DETECT` is never persisted as a category.
+- Ticket creation uses a backend-only OpenAI Responses API classification service with schema-constrained category, priority, and short-summary output. It loads active categories dynamically and retains a deterministic `Other`/`MEDIUM` fallback; `AUTO_DETECT` is never persisted as a category.
 - Technician claims use an atomic conditional update inside the same transaction as assignment history and activity creation. A partial unique assignment-history index adds a second database-level guard against multiple active assignments.
 - Admin assignment/reassignment uses a conditional current-state update, ends exactly one previous active assignment, and creates the new assignment plus activity in one transaction. Category names have database-enforced case-insensitive uniqueness; user management protects Admin self-lockout and technicians with active assigned work.
-- Azure Key Vault production secret loading is implemented through one asynchronous startup configuration layer and a small Azure SDK adapter. Private Supabase attachment upload, signed retrieval, and removal are implemented behind a centralized storage service with server-side RBAC and validation. Bidirectional EduCore peer integration is implemented with API-key authentication, database-enforced event idempotency, and an explicit technician/admin context endpoint. OpenAI and deployment integration remain unimplemented.
+- Azure Key Vault production secret loading is implemented through one asynchronous startup configuration layer and a small Azure SDK adapter. Private Supabase attachment upload, signed retrieval, and removal are implemented behind a centralized storage service with server-side RBAC and validation. Bidirectional EduCore peer integration is implemented with API-key authentication, database-enforced event idempotency, and an explicit technician/admin context endpoint. OpenAI ticket classification is implemented; deployment integration remains unimplemented.
 
 ## Do not implement yet
 
@@ -104,7 +104,7 @@ Planned entities are `User`, `Category`, `Ticket`, `Comment`, `TicketAssignment`
 
 ## AI classification and category origin
 
-OpenAI is a real future backend integration. It may inspect a ticket description and advise category, priority, and a short summary through fields such as `aiSuggestedCategory`, `aiSuggestedPriority`, and `aiSummary`.
+OpenAI ticket classification is a backend integration. It inspects the ticket title, description, optional location, and active category names, then advises category, priority, and a short summary through `aiSuggestedCategory`, `aiSuggestedPriority`, and `aiSummary`.
 
 AI is advisory, never final authority. Technicians/admins can override category and priority. Student/Faculty users never select priority.
 
@@ -115,7 +115,7 @@ Category creation UX must offer:
 
 If a user selects a category, preserve it unless later business rules explicitly change. If they choose auto-detect, the backend will classify it. Preserve classification origin where useful—for example `USER_SELECTED`, `AI_SUGGESTED`, or `TECHNICIAN_OVERRIDE`—without treating origin as the Category itself. Frontend mocks may simulate this behavior, but all real OpenAI calls belong in a backend AI/classification service.
 
-Priorities are `LOW`, `MEDIUM`, `HIGH`, and `URGENT`; the future backend assigns/recommends them automatically for requesters.
+Priorities are `LOW`, `MEDIUM`, `HIGH`, and `URGENT`; the backend assigns/recommends them automatically for requesters. User-selected categories remain actual with `USER_SELECTED`; auto-detect adopts a valid active suggestion with `AI_SUGGESTED`. OpenAI/provider/output failures fall back to active `Other` and `MEDIUM` without losing the ticket. Technician overrides remain authoritative and preserve original AI suggestion fields.
 
 ## Attachments and secrets
 
@@ -132,7 +132,7 @@ Attachment APIs accept up to five multipart files per request under the `files` 
 
 Local backend development may use `.env`. Production secrets (`DATABASE_URL`, `JWT_SECRET`, OpenAI/Supabase/peer/Microsoft credentials) come from Azure Key Vault through a centralized configuration layer, not scattered direct access. Key Vault does not belong in this frontend repository.
 
-Runtime startup now loads and validates configuration before constructing Prisma, sessions, Microsoft OAuth, or other services. Development defaults to environment secrets. Production defaults to and requires Azure Key Vault; `SECRET_SOURCE=azure-key-vault` can explicitly exercise that path outside production. The current vault mapping is `DATABASE-URL`, `DIRECT-URL`, `JWT-SECRET`, `MICROSOFT-CLIENT-SECRET`, `SUPABASE-SECRET-KEY`, `HELPDESK-PEER-API-KEY`, and `EDUCORE-API-KEY`. `DefaultAzureCredential` uses ordinary Azure bootstrap configuration, including `AZURE_KEY_VAULT_URL` plus service-principal environment credentials where needed. Prisma CLI migrations remain a separate deployment-time concern and require `DIRECT_URL` injection into the CLI process.
+Runtime startup now loads and validates configuration before constructing Prisma, sessions, Microsoft OAuth, or other services. Development defaults to environment secrets. Production defaults to and requires Azure Key Vault; `SECRET_SOURCE=azure-key-vault` can explicitly exercise that path outside production. The current vault mapping is `DATABASE-URL`, `DIRECT-URL`, `JWT-SECRET`, `MICROSOFT-CLIENT-SECRET`, `SUPABASE-SECRET-KEY`, `HELPDESK-PEER-API-KEY`, `EDUCORE-API-KEY`, and `OPENAI-API-KEY`. `DefaultAzureCredential` uses ordinary Azure bootstrap configuration, including `AZURE_KEY_VAULT_URL` plus service-principal environment credentials where needed. Prisma CLI migrations remain a separate deployment-time concern and require `DIRECT_URL` injection into the CLI process.
 
 The Phase 2 backend requires `JWT_SECRET` to be at least 32 characters. Session JWTs are short-lived, use a fixed issuer/audience and HS256 algorithm, and are sent only through the `helpdesk_session` HttpOnly cookie.
 
@@ -147,7 +147,7 @@ EduCore is a student course-registration backend. Communication is bidirectional
 
 Keep this behind a peer-integration service. Do not tightly couple the core Ticket model to EduCore-specific fields.
 
-The implemented incoming route is `POST /api/peer/educore/tickets`, authenticated only by the HelpDesk-issued `x-api-key`. It resolves an existing active requester by email and creates a normal `OPEN`, `HIGH`-priority Course Registration ticket. `PeerTicketReference` stores the generic `EDUCORE` plus external event ID mapping, with a database unique constraint protecting idempotent retries and concurrency. The support-only endpoint `GET /api/tickets/:ticketId/educore-context` uses the existing JWT/RBAC ticket authorization, then calls the isolated EduCore HTTP client. The final EduCore context path remains partner-controlled and is configurable with `EDUCORE_CONTEXT_PATH_TEMPLATE`; its provisional default must not be treated as the finalized partner contract.
+The implemented incoming route is `POST /api/integrations/educore/tickets`, authenticated only by the HelpDesk-issued `x-api-key`. It resolves an existing active requester by email and creates a normal `OPEN`, `HIGH`-priority Course Registration ticket. `PeerTicketReference` stores the generic `EDUCORE` plus external event ID mapping, with a database unique constraint protecting idempotent retries and concurrency. The support-only endpoint `GET /api/tickets/:ticketId/educore-context` uses the existing JWT/RBAC ticket authorization, then calls the isolated EduCore HTTP client. The final EduCore context path remains partner-controlled and is configurable with `EDUCORE_CONTEXT_PATH_TEMPLATE`; its provisional default must not be treated as the finalized partner contract.
 
 ## Service boundaries
 

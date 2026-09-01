@@ -46,7 +46,7 @@ describe("EduCore incoming peer API", () => {
 
   after(async () => new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())));
 
-  const post = (body: unknown, key?: string) => fetch(`${baseUrl}/api/peer/educore/tickets`, {
+  const post = (body: unknown, key?: string) => fetch(`${baseUrl}/api/integrations/educore/tickets`, {
     method: "POST",
     headers: { "content-type": "application/json", ...(key ? { "x-api-key": key } : {}) },
     body: JSON.stringify(body),

@@ -11,6 +11,7 @@ import { logger } from "../lib/logger.js";
 import type { StorageService, StoredFile } from "../storage/storage.service.js";
 import { validateAttachmentFile } from "../validation/attachment.validation.js";
 import { attachmentSelect } from "./attachment-select.js";
+import { isTicketRelevantToTechnician } from "./technician-ticket-access.js";
 
 const activeStatuses = [TicketStatus.OPEN, TicketStatus.CLAIMED, TicketStatus.IN_PROGRESS] as const;
 const signedUrlLifetimeSeconds = 600;
@@ -156,7 +157,7 @@ export class AttachmentService {
     if (!ticket) throw new HttpError(404, "TICKET_NOT_FOUND", "Ticket not found");
     const allowed = actor.role === UserRole.ADMIN
       || (actor.role === UserRole.TECHNICIAN
-        ? ticket.assignedTechnicianId === actor.id || (ticket.status === TicketStatus.OPEN && !ticket.assignedTechnicianId)
+        ? isTicketRelevantToTechnician(ticket, actor.id)
         : ticket.creatorId === actor.id);
     if (!allowed) throw new HttpError(403, "ATTACHMENT_ACCESS_DENIED", "You cannot view attachments for this ticket");
   }

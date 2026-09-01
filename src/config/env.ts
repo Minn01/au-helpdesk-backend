@@ -13,6 +13,7 @@ export type AppConfig = {
   jwtSecret: string;
   microsoft?: MicrosoftConfig | undefined;
   supabase: { url: string; secretKey: string; storageBucket: string };
+  openai: { apiKey: string; model: string; timeoutMs: number };
   educore?: {
     baseUrl: string;
     incomingApiKey: string;
@@ -41,6 +42,21 @@ const parsePort = (value: string | undefined): number => {
   const port = Number(value);
   if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new Error("PORT must be an integer between 1 and 65535");
   return port;
+};
+
+const parseOpenAITimeout = (value: string | undefined): number => {
+  if (value === undefined) return 8_000;
+  const timeout = Number(value);
+  if (!Number.isInteger(timeout) || timeout < 1_000 || timeout > 30_000) {
+    throw new Error("OPENAI_TIMEOUT_MS must be an integer between 1000 and 30000");
+  }
+  return timeout;
+};
+
+const parseOpenAIModel = (value: string | undefined): string => {
+  const model = value?.trim() || "gpt-5.6-luna";
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(model)) throw new Error("OPENAI_MODEL is invalid");
+  return model;
 };
 
 const parseNodeEnv = (value: string | undefined): NodeEnvironment => {
@@ -171,6 +187,11 @@ export const loadConfiguration = async (options: LoadConfigurationOptions = {}):
       url: required(environment.SUPABASE_URL, "SUPABASE_URL"),
       secretKey: required(supabaseSecretKey, "SUPABASE_SECRET_KEY"),
       storageBucket: environment.SUPABASE_STORAGE_BUCKET || "ticket-attachments",
+    },
+    openai: {
+      apiKey: required(value("OPENAI_API_KEY"), "OPENAI_API_KEY"),
+      model: parseOpenAIModel(environment.OPENAI_MODEL),
+      timeoutMs: parseOpenAITimeout(environment.OPENAI_TIMEOUT_MS),
     },
     educore: createEduCoreConfig(environment, helpdeskPeerApiKey, educoreApiKey, nodeEnv),
   };

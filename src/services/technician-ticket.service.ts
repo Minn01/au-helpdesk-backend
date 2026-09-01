@@ -9,6 +9,7 @@ import {
 import { HttpError } from "../errors/http-error.js";
 import type { MineFilters } from "./ticket.service.js";
 import { attachmentSelect } from "./attachment-select.js";
+import { technicianTicketRelevanceWhere } from "./technician-ticket-access.js";
 
 const userSelect = { id: true, displayName: true, role: true } as const;
 const categorySelect = { id: true, name: true, description: true } as const;
@@ -83,10 +84,7 @@ export class TechnicianTicketService {
     const ticket = await this.database.ticket.findFirst({
       where: {
         id: ticketId,
-        OR: [
-          { status: TicketStatus.OPEN, assignedTechnicianId: null },
-          { assignedTechnicianId: technicianId },
-        ],
+        ...technicianTicketRelevanceWhere(technicianId),
       },
       include: detailInclude,
     });
@@ -186,7 +184,7 @@ export class TechnicianTicketService {
   }
 
   async listComments(ticketId: string, technicianId: string) {
-    await this.assertAssigned(ticketId, technicianId);
+    await this.assertRelevant(ticketId, technicianId);
     return this.database.comment.findMany({
       where: { ticketId },
       orderBy: { createdAt: "asc" },
@@ -272,9 +270,9 @@ export class TechnicianTicketService {
     });
   }
 
-  private async assertAssigned(ticketId: string, technicianId: string) {
+  private async assertRelevant(ticketId: string, technicianId: string) {
     const ticket = await this.database.ticket.findFirst({
-      where: { id: ticketId, assignedTechnicianId: technicianId },
+      where: { id: ticketId, ...technicianTicketRelevanceWhere(technicianId) },
       select: { id: true },
     });
     if (!ticket) throw new HttpError(404, "TICKET_NOT_FOUND", "Ticket not found");

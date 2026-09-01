@@ -4,7 +4,7 @@ import { createUserRepository } from "./auth/user.repository.js";
 import type { AppConfig } from "./config/env.js";
 import { createPrismaClient } from "./lib/prisma.js";
 import { CategoryService } from "./services/category.service.js";
-import { fallbackClassificationService } from "./services/classification.service.js";
+import { OpenAIClassificationService } from "./services/openai-classification.service.js";
 import { TicketService } from "./services/ticket.service.js";
 import { TechnicianTicketService } from "./services/technician-ticket.service.js";
 import { AdminManagementService } from "./services/admin-management.service.js";
@@ -38,7 +38,10 @@ export const createDefaultApp = (config: AppConfig) => {
     users: createUserRepository(prisma),
     sessions: createSessionService(config.jwtSecret),
     categories: new CategoryService(prisma),
-    tickets: new TicketService(prisma, fallbackClassificationService),
+    tickets: new TicketService(
+      prisma,
+      new OpenAIClassificationService(config.openai.apiKey, config.openai.model, config.openai.timeoutMs),
+    ),
     technicianTickets: new TechnicianTicketService(prisma),
     adminTickets: new AdminTicketService(prisma),
     adminManagement: new AdminManagementService(prisma),

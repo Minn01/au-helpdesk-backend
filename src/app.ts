@@ -45,7 +45,9 @@ export const createApp = (dependencies: AppDependencies) => {
   app.use("/api/health", healthRouter);
   app.use("/api/auth", createAuthRouter(dependencies.users, dependencies.sessions, isProduction, dependencies.microsoft));
   app.use("/api/categories", createCategoryRouter(dependencies.users, dependencies.sessions, dependencies.categories));
-  if (dependencies.peer) app.use("/api/peer", createPeerRouter(dependencies.peer.apiKey, dependencies.peer.tickets));
+  if (dependencies.peer) {
+    app.use("/api/integrations", createPeerRouter(dependencies.peer.apiKey, dependencies.peer.tickets));
+  }
   app.use(
     "/api/admin",
     createAdminRouter(

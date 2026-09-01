@@ -9,6 +9,7 @@ export const KEY_VAULT_SECRET_NAMES = {
   SUPABASE_SECRET_KEY: "SUPABASE-SECRET-KEY",
   HELPDESK_PEER_API_KEY: "HELPDESK-PEER-API-KEY",
   EDUCORE_API_KEY: "EDUCORE-API-KEY",
+  OPENAI_API_KEY: "OPENAI-API-KEY",
 } as const;
 
 export type SecretLoader = { load(secretNames: readonly string[]): Promise<Record<string, string>> };

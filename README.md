@@ -4,7 +4,7 @@
 
 Configuration is loaded once before Prisma, authentication, or application services are initialized. Local development uses `.env`; production uses Azure Key Vault. Controllers and services receive initialized dependencies and never access the vault directly.
 
-Copy `.env.example` to `.env` for local development. At minimum, local runtime requires `DATABASE_URL` and a `JWT_SECRET` of at least 32 characters. Microsoft authentication remains optional in development, but if any Microsoft setting is supplied, all Microsoft settings are required.
+Copy `.env.example` to `.env` for local development. Local runtime requires `DATABASE_URL`, a `JWT_SECRET` of at least 32 characters, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, and `OPENAI_API_KEY`. `DIRECT_URL` is also needed by Prisma CLI migration commands. Microsoft authentication remains optional in development, but if any Microsoft setting is supplied, all Microsoft settings are required.
 
 Production defaults to `SECRET_SOURCE=azure-key-vault`. This mode can also be selected explicitly in development for a smoke test. It requires `AZURE_KEY_VAULT_URL`. `DefaultAzureCredential` handles authentication; for the temporary development vault it can use `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and `AZURE_CLIENT_SECRET`. These are bootstrap credentials and must not be committed.
 
@@ -19,8 +19,15 @@ The vault mapping is:
 | `SUPABASE-SECRET-KEY` | `SUPABASE_SECRET_KEY` |
 | `HELPDESK-PEER-API-KEY` | `HELPDESK_PEER_API_KEY` |
 | `EDUCORE-API-KEY` | `EDUCORE_API_KEY` |
+| `OPENAI-API-KEY` | `OPENAI_API_KEY` |
 
 Non-secret values—including `MICROSOFT_CLIENT_ID`, `MICROSOFT_TENANT_ID`, `MICROSOFT_REDIRECT_URI`, `FRONTEND_URL`, `SUPABASE_URL`, `PORT`, and `NODE_ENV`—remain ordinary environment variables. Production startup fails if Key Vault access or any required vault secret fails; it does not fall back to environment secrets.
+
+## OpenAI ticket classification
+
+Ticket creation makes at most one backend-only OpenAI Responses API request using strict structured output. The request contains only the ticket title, description, optional location, and current active category names. `OPENAI_API_KEY` is required from the environment in local environment-secret mode or from Key Vault secret `OPENAI-API-KEY` in vault mode. `OPENAI_MODEL` defaults to `gpt-5.6-luna`; `OPENAI_TIMEOUT_MS` defaults to 8000 and accepts 1000–30000 milliseconds.
+
+When a requester selects a category, that category remains authoritative with `USER_SELECTED`; AI can recommend priority and preserve a separate suggested category and short summary. For auto-detect, a valid active AI category becomes the actual category with `AI_SUGGESTED`. Malformed output, invalid/inactive categories, timeouts, rate limits, and provider failures fall back to active `Other` with `MEDIUM` priority so ticket submission can continue. Technician category and priority overrides remain authoritative and do not overwrite the original AI suggestion fields. OpenAI is never called by the frontend and does not make status, assignment, resolution, or permission decisions.
 
 Prisma runtime receives the loaded `DATABASE_URL` directly after configuration completes. Prisma CLI commands run as separate deployment-time processes, so migrations still require `DIRECT_URL` to be injected into that process (for example, by the future deployment pipeline). The Express application does not run migrations at startup.
 
@@ -39,7 +46,7 @@ HelpDesk and EduCore authenticate service-to-service calls exclusively with an `
 ### HelpDesk API exposed to EduCore
 
 ```http
-POST /api/peer/educore/tickets
+POST /api/integrations/educore/tickets
 x-api-key: <HelpDesk-issued key>
 Content-Type: application/json
 ```

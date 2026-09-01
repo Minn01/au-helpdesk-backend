@@ -5,6 +5,7 @@ import { AzureKeyVaultSecretLoader, KEY_VAULT_SECRET_NAMES, type SecretLoader } 
 
 const jwtSecret = "test-jwt-secret-that-is-at-least-32-characters";
 const localSupabase = { SUPABASE_URL: "https://project.supabase.co", SUPABASE_SECRET_KEY: "local-supabase-secret" };
+const localOpenAI = { OPENAI_API_KEY: "test-openai-key" };
 const productionEnvironment = {
   NODE_ENV: "production",
   AZURE_KEY_VAULT_URL: "https://helpdesk.vault.azure.net",
@@ -23,16 +24,22 @@ const vaultSecrets = {
   "SUPABASE-SECRET-KEY": "supabase-secret",
   "HELPDESK-PEER-API-KEY": "helpdesk-peer-key-at-least-32-characters",
   "EDUCORE-API-KEY": "educore-outgoing-key-at-least-32-characters",
+  "OPENAI-API-KEY": "openai-secret",
 };
 
 describe("application configuration", () => {
   it("continues to load local development secrets from the environment", async () => {
     const config = await loadConfiguration({
-      environment: { NODE_ENV: "development", DATABASE_URL: "postgresql://local", JWT_SECRET: jwtSecret, ...localSupabase },
+      environment: {
+        NODE_ENV: "development", DATABASE_URL: "postgresql://local", JWT_SECRET: jwtSecret, ...localSupabase, ...localOpenAI,
+      },
     });
     assert.equal(config.secretSource, "environment");
     assert.equal(config.databaseUrl, "postgresql://local");
     assert.equal(config.jwtSecret, jwtSecret);
+    assert.equal(config.openai.apiKey, localOpenAI.OPENAI_API_KEY);
+    assert.equal(config.openai.model, "gpt-5.6-luna");
+    assert.equal(config.openai.timeoutMs, 8_000);
     assert.equal(config.microsoft, undefined);
   });
 
@@ -50,12 +57,22 @@ describe("application configuration", () => {
     assert.equal(config.supabase.secretKey, vaultSecrets["SUPABASE-SECRET-KEY"]);
     assert.equal(config.educore?.incomingApiKey, vaultSecrets["HELPDESK-PEER-API-KEY"]);
     assert.equal(config.educore?.outgoingApiKey, vaultSecrets["EDUCORE-API-KEY"]);
+    assert.equal(config.openai.apiKey, vaultSecrets["OPENAI-API-KEY"]);
   });
 
   it("validates required environment secrets", async () => {
     await assert.rejects(
-      loadConfiguration({ environment: { NODE_ENV: "development", DATABASE_URL: "postgresql://local", ...localSupabase } }),
+      loadConfiguration({ environment: { NODE_ENV: "development", DATABASE_URL: "postgresql://local", ...localSupabase, ...localOpenAI } }),
       /JWT_SECRET is required/,
+    );
+  });
+
+  it("requires an OpenAI key and validates model configuration", async () => {
+    const base = { NODE_ENV: "development", DATABASE_URL: "postgresql://local", JWT_SECRET: jwtSecret, ...localSupabase };
+    await assert.rejects(loadConfiguration({ environment: base }), /OPENAI_API_KEY is required/);
+    await assert.rejects(
+      loadConfiguration({ environment: { ...base, ...localOpenAI, OPENAI_MODEL: "invalid model name" } }),
+      /OPENAI_MODEL is invalid/,
     );
   });
 
