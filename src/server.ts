@@ -4,7 +4,7 @@ import { loadConfiguration } from "./config/env.js";
 import { logger } from "./lib/logger.js";
 
 const config = await loadConfiguration();
-const server = createDefaultApp(config).listen(config.port, () => {
+const server = createDefaultApp(config).listen(config.port, "0.0.0.0", () => {
   logger.info("AU HelpDesk API started", {
     environment: config.nodeEnv,
     port: config.port,

@@ -1,0 +1,20 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: au-helpdesk-backend:latest
+    container_name: au-helpdesk-backend
+
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:5050:5050"
+
+    env_file:
+      - .env.production
+
+    environment:
+      NODE_ENV: production
+      PORT: "5050"
