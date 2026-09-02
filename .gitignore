@@ -1,7 +1,6 @@
 # Dependencies
 node_modules/
 jspm_packages/
-pnpm-lock.yaml
 yarn-error.log
 
 # Environment variables and secrets
