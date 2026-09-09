@@ -1,4 +1,6 @@
 # AU HelpDesk backend
+BAD 541 — Systems Integration Project 1
+- **Team:** Aung Myint Myat (6611906), Soe Min Min Latt (6611938), Min Thant (6612012)
 
 ## Configuration and secrets
 
