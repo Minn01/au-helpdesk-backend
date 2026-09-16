@@ -72,14 +72,16 @@ export class TicketService {
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.priority ? { priority: filters.priority } : {}),
       ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
-      ...(filters.search ? {
-        OR: [
-          { ticketNumber: { contains: filters.search, mode: "insensitive" } },
-          { title: { contains: filters.search, mode: "insensitive" } },
-          { description: { contains: filters.search, mode: "insensitive" } },
-          { location: { contains: filters.search, mode: "insensitive" } },
-        ],
-      } : {}),
+      ...(filters.search
+        ? {
+            OR: [
+              { ticketNumber: { contains: filters.search, mode: "insensitive" } },
+              { title: { contains: filters.search, mode: "insensitive" } },
+              { description: { contains: filters.search, mode: "insensitive" } },
+              { location: { contains: filters.search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
     };
     const [tickets, total] = await this.database.$transaction([
       this.database.ticket.findMany({
@@ -136,14 +138,18 @@ export class TicketService {
                 categorySource: category.source,
               },
             },
-            ...(category.classificationSucceeded ? [{
-              type: "AI_CLASSIFICATION_COMPLETED",
-              message: "AI ticket classification completed",
-              metadata: {
-                suggestedCategoryId: category.aiSuggestedCategoryId,
-                suggestedPriority: category.aiSuggestedPriority,
-              },
-            }] : []),
+            ...(category.classificationSucceeded
+              ? [
+                  {
+                    type: "AI_CLASSIFICATION_COMPLETED",
+                    message: "AI ticket classification completed",
+                    metadata: {
+                      suggestedCategoryId: category.aiSuggestedCategoryId,
+                      suggestedPriority: category.aiSuggestedPriority,
+                    },
+                  },
+                ]
+              : []),
           ],
         },
       },
@@ -160,12 +166,17 @@ export class TicketService {
     if (snapshot.status !== TicketStatus.OPEN) {
       throw new HttpError(409, "TICKET_NOT_OPEN", "Only OPEN tickets can be edited");
     }
-    const category = input.category ? await this.resolveCategory({
-      ...input.category,
-      title: input.title ?? snapshot.title,
-      description: input.description ?? snapshot.description,
-      location: null,
-    }, false) : undefined;
+    const category = input.category
+      ? await this.resolveCategory(
+          {
+            ...input.category,
+            title: input.title ?? snapshot.title,
+            description: input.description ?? snapshot.description,
+            location: null,
+          },
+          false,
+        )
+      : undefined;
 
     return this.database.$transaction(async (transaction) => {
       const current = await transaction.ticket.findFirst({
@@ -189,14 +200,16 @@ export class TicketService {
           ...(input.title !== undefined ? { title: input.title } : {}),
           ...(input.description !== undefined ? { description: input.description } : {}),
           ...(input.location !== undefined ? { location: input.location } : {}),
-          ...(category ? {
-            categoryId: category.id,
-            categorySource: category.source,
-            ...(category.priority ? { priority: category.priority } : {}),
-            aiSuggestedCategoryId: category.aiSuggestedCategoryId,
-            aiSuggestedPriority: category.aiSuggestedPriority,
-            aiSummary: category.aiSummary,
-          } : {}),
+          ...(category
+            ? {
+                categoryId: category.id,
+                categorySource: category.source,
+                ...(category.priority ? { priority: category.priority } : {}),
+                aiSuggestedCategoryId: category.aiSuggestedCategoryId,
+                aiSuggestedPriority: category.aiSuggestedPriority,
+                aiSummary: category.aiSummary,
+              }
+            : {}),
         },
       });
       if (result.count !== 1) {
@@ -211,7 +224,10 @@ export class TicketService {
           metadata: { changedFields },
         },
       });
-      return transaction.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: detailInclude });
+      return transaction.ticket.findUniqueOrThrow({
+        where: { id: ticketId },
+        include: detailInclude,
+      });
     });
   }
 
@@ -244,7 +260,10 @@ export class TicketService {
           metadata: { fromStatus: TicketStatus.OPEN, toStatus: TicketStatus.CANCELLED },
         },
       });
-      return transaction.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: detailInclude });
+      return transaction.ticket.findUniqueOrThrow({
+        where: { id: ticketId },
+        include: detailInclude,
+      });
     });
   }
 
@@ -295,9 +314,10 @@ export class TicketService {
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     });
-    const selected = input.categoryIntent === "CATEGORY"
-      ? activeCategories.find((category) => category.id === input.categoryId)
-      : undefined;
+    const selected =
+      input.categoryIntent === "CATEGORY"
+        ? activeCategories.find((category) => category.id === input.categoryId)
+        : undefined;
     if (input.categoryIntent === "CATEGORY" && !selected) {
       throw new HttpError(400, "INVALID_CATEGORY", "Category is not active or does not exist");
     }
@@ -312,8 +332,11 @@ export class TicketService {
           location: input.location,
           activeCategoryNames: activeCategories.map((category) => category.name),
         });
-        suggestedCategory = activeCategories.find((category) => category.name === classification!.categoryName);
-        if (!suggestedCategory) throw new Error("Classifier returned an inactive or nonexistent category");
+        suggestedCategory = activeCategories.find(
+          (category) => category.name === classification!.categoryName,
+        );
+        if (!suggestedCategory)
+          throw new Error("Classifier returned an inactive or nonexistent category");
       } catch (error) {
         logger.warn("OpenAI ticket classification failed; using deterministic fallback", {
           failureType: error instanceof Error ? error.constructor.name : "UnknownError",
@@ -327,7 +350,7 @@ export class TicketService {
       return {
         id: selected!.id,
         source: CategorySource.USER_SELECTED,
-        priority: useAI ? classification?.priority ?? TicketPriority.MEDIUM : undefined,
+        priority: useAI ? (classification?.priority ?? TicketPriority.MEDIUM) : undefined,
         aiSuggestedCategoryId: suggestedCategory?.id ?? null,
         aiSuggestedPriority: classification?.priority ?? null,
         aiSummary: classification?.summary ?? null,
@@ -346,8 +369,15 @@ export class TicketService {
         classificationSucceeded: true,
       } as const;
     }
-    const fallback = activeCategories.find((category) => category.name.toLocaleLowerCase() === "other");
-    if (!fallback) throw new HttpError(503, "CLASSIFICATION_UNAVAILABLE", "Automatic classification is unavailable");
+    const fallback = activeCategories.find(
+      (category) => category.name.toLocaleLowerCase() === "other",
+    );
+    if (!fallback)
+      throw new HttpError(
+        503,
+        "CLASSIFICATION_UNAVAILABLE",
+        "Automatic classification is unavailable",
+      );
     return {
       id: fallback.id,
       source: CategorySource.AI_SUGGESTED,

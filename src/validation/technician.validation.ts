@@ -19,13 +19,17 @@ export const parseClassificationUpdate = (value: unknown) => {
   }
   let priority: TicketPriority | undefined;
   if (body.priority !== undefined) {
-    if (typeof body.priority !== "string" || !Object.values(TicketPriority).includes(body.priority as TicketPriority)) {
+    if (
+      typeof body.priority !== "string" ||
+      !Object.values(TicketPriority).includes(body.priority as TicketPriority)
+    ) {
       return validationError("priority is invalid");
     }
     priority = body.priority as TicketPriority;
   }
   return {
-    categoryId: body.categoryId === undefined ? undefined : parseUuid(body.categoryId, "categoryId"),
+    categoryId:
+      body.categoryId === undefined ? undefined : parseUuid(body.categoryId, "categoryId"),
     priority,
   };
 };

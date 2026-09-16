@@ -1,9 +1,14 @@
 import { TicketPriority, TicketStatus } from "../../generated/prisma/client.js";
-import { assertObject, parseOptionalString, parseString, parseUuid, validationError } from "./common.js";
+import {
+  assertObject,
+  parseOptionalString,
+  parseString,
+  parseUuid,
+  validationError,
+} from "./common.js";
 
 export type CategoryIntent =
-  | { categoryId: string; categoryIntent: "CATEGORY" }
-  | { categoryIntent: "AUTO_DETECT" };
+  { categoryId: string; categoryIntent: "CATEGORY" } | { categoryIntent: "AUTO_DETECT" };
 
 export type CreateTicketInput = CategoryIntent & {
   title: string;
@@ -18,14 +23,18 @@ export type UpdateTicketInput = {
   category?: CategoryIntent;
 };
 
-const parseCategoryIntent = (body: Record<string, unknown>, required: boolean): CategoryIntent | undefined => {
+const parseCategoryIntent = (
+  body: Record<string, unknown>,
+  required: boolean,
+): CategoryIntent | undefined => {
   const hasCategoryId = body.categoryId !== undefined;
   const hasIntent = body.categoryIntent !== undefined;
   if (!hasCategoryId && !hasIntent) {
     if (required) return validationError("Provide categoryId or categoryIntent=AUTO_DETECT");
     return undefined;
   }
-  if (hasCategoryId && hasIntent) return validationError("Provide either categoryId or categoryIntent, not both");
+  if (hasCategoryId && hasIntent)
+    return validationError("Provide either categoryId or categoryIntent, not both");
   if (hasCategoryId) {
     return { categoryId: parseUuid(body.categoryId, "categoryId"), categoryIntent: "CATEGORY" };
   }
@@ -55,14 +64,17 @@ export const parseUpdateTicket = (value: unknown): UpdateTicketInput => {
   if (unknown) return validationError(`Unknown field: ${unknown}`);
 
   const result: UpdateTicketInput = {};
-  if (body.title !== undefined) result.title = parseString(body.title, "title", { min: 5, max: 160 });
+  if (body.title !== undefined)
+    result.title = parseString(body.title, "title", { min: 5, max: 160 });
   if (body.description !== undefined) {
     result.description = parseString(body.description, "description", { min: 10, max: 5_000 });
   }
-  if (body.location !== undefined) result.location = parseOptionalString(body.location, "location", 200) ?? null;
+  if (body.location !== undefined)
+    result.location = parseOptionalString(body.location, "location", 200) ?? null;
   const category = parseCategoryIntent(body, false);
   if (category) result.category = category;
-  if (Object.keys(result).length === 0) return validationError("At least one editable field is required");
+  if (Object.keys(result).length === 0)
+    return validationError("At least one editable field is required");
   return result;
 };
 
@@ -77,7 +89,12 @@ const oneQueryValue = (value: unknown, field: string): string | undefined => {
   return value;
 };
 
-const parsePositiveInt = (value: string | undefined, field: string, fallback: number, max: number) => {
+const parsePositiveInt = (
+  value: string | undefined,
+  field: string,
+  fallback: number,
+  max: number,
+) => {
   if (value === undefined) return fallback;
   if (!/^\d+$/.test(value)) return validationError(`${field} must be a positive integer`);
   const number = Number(value);
@@ -87,7 +104,8 @@ const parsePositiveInt = (value: string | undefined, field: string, fallback: nu
 
 export const parseMineQuery = (query: Record<string, unknown>) => {
   const searchValue = oneQueryValue(query.search, "search")?.trim();
-  if (searchValue && searchValue.length > 200) return validationError("search must be at most 200 characters");
+  if (searchValue && searchValue.length > 200)
+    return validationError("search must be at most 200 characters");
   const statusValue = oneQueryValue(query.status, "status");
   const priorityValue = oneQueryValue(query.priority, "priority");
   const sort = oneQueryValue(query.sort, "sort") ?? "newest";
@@ -97,13 +115,17 @@ export const parseMineQuery = (query: Record<string, unknown>) => {
   if (priorityValue && !Object.values(TicketPriority).includes(priorityValue as TicketPriority)) {
     return validationError("priority is invalid");
   }
-  if (sort !== "newest" && sort !== "oldest") return validationError("sort must be newest or oldest");
+  if (sort !== "newest" && sort !== "oldest")
+    return validationError("sort must be newest or oldest");
 
   return {
     search: searchValue || undefined,
     status: statusValue as TicketStatus | undefined,
     priority: priorityValue as TicketPriority | undefined,
-    categoryId: query.category === undefined ? undefined : parseUuid(oneQueryValue(query.category, "category"), "category"),
+    categoryId:
+      query.category === undefined
+        ? undefined
+        : parseUuid(oneQueryValue(query.category, "category"), "category"),
     sort,
     page: parsePositiveInt(oneQueryValue(query.page, "page"), "page", 1, 1_000_000),
     pageSize: parsePositiveInt(oneQueryValue(query.pageSize, "pageSize"), "pageSize", 20, 100),

@@ -3,7 +3,10 @@ import type { UserRepository } from "../auth/auth.types.js";
 import type { SessionService } from "../auth/session.service.js";
 import { createLogout, getMe } from "../controllers/auth.controller.js";
 import { createRequireAuth } from "../middleware/auth.middleware.js";
-import { createMicrosoftAuthController, type MicrosoftAuthDependencies } from "../controllers/microsoft-auth.controller.js";
+import {
+  createMicrosoftAuthController,
+  type MicrosoftAuthDependencies,
+} from "../controllers/microsoft-auth.controller.js";
 
 export const createAuthRouter = (
   users: UserRepository,

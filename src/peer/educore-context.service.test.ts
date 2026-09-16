@@ -17,26 +17,48 @@ function user(id: string, role: UserRole): AuthUser {
 }
 
 const context = {
-  studentId: "S123", courseCode: "ITX4181", registrationStatus: "FAILED",
-  failureReason: "System error", attemptedAt: "2026-08-31T01:02:03.000Z", additionalContext: null,
+  studentId: "S123",
+  courseCode: "ITX4181",
+  registrationStatus: "FAILED",
+  failureReason: "System error",
+  attemptedAt: "2026-08-31T01:02:03.000Z",
+  additionalContext: null,
 };
 
-const harness = (ticket: null | { assignedTechnicianId: string | null; status: TicketStatus; peerReferences: Array<{ externalEventId: string }> }) => {
+const harness = (
+  ticket: null | {
+    assignedTechnicianId: string | null;
+    status: TicketStatus;
+    peerReferences: Array<{ externalEventId: string }>;
+  },
+) => {
   let calls = 0;
-  const client: EduCoreClient = { getRegistrationContext: async () => { calls += 1; return context; } };
+  const client: EduCoreClient = {
+    getRegistrationContext: async () => {
+      calls += 1;
+      return context;
+    },
+  };
   const database = { ticket: { findUnique: async () => ticket } };
   return { service: new EduCoreContextService(database as never, client), calls: () => calls };
 };
 
 const errorCode = async (promise: Promise<unknown>) => {
-  try { await promise; assert.fail("Expected an HttpError"); } catch (error) {
+  try {
+    await promise;
+    assert.fail("Expected an HttpError");
+  } catch (error) {
     assert.ok(error instanceof HttpError);
     return error.code;
   }
 };
 
 describe("EduCore diagnostic context authorization", () => {
-  const assignedTicket = { assignedTechnicianId: technician.id, status: TicketStatus.IN_PROGRESS, peerReferences: [{ externalEventId: "event-1" }] };
+  const assignedTicket = {
+    assignedTechnicianId: technician.id,
+    status: TicketStatus.IN_PROGRESS,
+    peerReferences: [{ externalEventId: "event-1" }],
+  };
 
   it("does not allow requesters to fetch internal peer context", async () => {
     const { service, calls } = harness(assignedTicket);
@@ -63,7 +85,10 @@ describe("EduCore diagnostic context authorization", () => {
 
   it("does not use an unrelated ticket as an arbitrary EduCore proxy", async () => {
     const { service, calls } = harness({ ...assignedTicket, peerReferences: [] });
-    assert.equal(await errorCode(service.getForTicket(ticketId, admin)), "EDUCORE_CONTEXT_NOT_AVAILABLE");
+    assert.equal(
+      await errorCode(service.getForTicket(ticketId, admin)),
+      "EDUCORE_CONTEXT_NOT_AVAILABLE",
+    );
     assert.equal(calls(), 0);
   });
 });

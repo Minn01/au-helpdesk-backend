@@ -35,10 +35,19 @@ export const createOAuthStateService = (secret: string): OAuthStateService => ({
     return { state, nonce, token };
   },
   verify: (token, returnedState) => {
-    if (!token || !returnedState) throw new HttpError(400, "INVALID_OAUTH_STATE", "Authentication state is invalid or expired");
+    if (!token || !returnedState)
+      throw new HttpError(400, "INVALID_OAUTH_STATE", "Authentication state is invalid or expired");
     try {
-      const payload = jwt.verify(token, secret, { algorithms: ["HS256"], audience: AUDIENCE, issuer: ISSUER });
-      if (typeof payload === "string" || typeof payload.state !== "string" || typeof payload.nonce !== "string") {
+      const payload = jwt.verify(token, secret, {
+        algorithms: ["HS256"],
+        audience: AUDIENCE,
+        issuer: ISSUER,
+      });
+      if (
+        typeof payload === "string" ||
+        typeof payload.state !== "string" ||
+        typeof payload.nonce !== "string"
+      ) {
         throw new Error("Invalid state payload");
       }
       if (!equal(payload.state, returnedState)) throw new Error("State mismatch");

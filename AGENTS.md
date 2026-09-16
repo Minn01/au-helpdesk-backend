@@ -173,6 +173,8 @@ Broad order: frontend product/UI → database/Prisma design → Microsoft auth +
 
 ## Review and verification
 
+Run `pnpm format` after editing backend TypeScript files; use `pnpm format:check` to verify formatting. To format one file, run `pnpm exec prettier --write path/to/file.ts`.
+
 Before changes, read this file and relevant source/config/types, run `git status --short`, preserve unrelated edits, and trace UI data through API modules to mocks.
 
 Review priorities:

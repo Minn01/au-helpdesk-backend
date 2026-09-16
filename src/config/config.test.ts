@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { loadConfiguration } from "./env.js";
-import { AzureKeyVaultSecretLoader, KEY_VAULT_SECRET_NAMES, type SecretLoader } from "./key-vault.js";
+import {
+  AzureKeyVaultSecretLoader,
+  KEY_VAULT_SECRET_NAMES,
+  type SecretLoader,
+} from "./key-vault.js";
 
 const jwtSecret = "test-jwt-secret-that-is-at-least-32-characters";
-const localSupabase = { SUPABASE_URL: "https://project.supabase.co", SUPABASE_SECRET_KEY: "local-supabase-secret" };
+const localSupabase = {
+  SUPABASE_URL: "https://project.supabase.co",
+  SUPABASE_SECRET_KEY: "local-supabase-secret",
+};
 const localOpenAI = { OPENAI_API_KEY: "test-openai-key" };
 const productionEnvironment = {
   NODE_ENV: "production",
@@ -31,7 +38,11 @@ describe("application configuration", () => {
   it("continues to load local development secrets from the environment", async () => {
     const config = await loadConfiguration({
       environment: {
-        NODE_ENV: "development", DATABASE_URL: "postgresql://local", JWT_SECRET: jwtSecret, ...localSupabase, ...localOpenAI,
+        NODE_ENV: "development",
+        DATABASE_URL: "postgresql://local",
+        JWT_SECRET: jwtSecret,
+        ...localSupabase,
+        ...localOpenAI,
       },
     });
     assert.equal(config.secretSource, "environment");
@@ -46,7 +57,10 @@ describe("application configuration", () => {
   it("maps Key Vault names into typed application configuration", async () => {
     let requested: readonly string[] = [];
     const secretLoader: SecretLoader = {
-      load: async (names) => { requested = names; return vaultSecrets; },
+      load: async (names) => {
+        requested = names;
+        return vaultSecrets;
+      },
     };
     const config = await loadConfiguration({ environment: productionEnvironment, secretLoader });
     assert.deepEqual(requested, Object.values(KEY_VAULT_SECRET_NAMES));
@@ -62,28 +76,49 @@ describe("application configuration", () => {
 
   it("validates required environment secrets", async () => {
     await assert.rejects(
-      loadConfiguration({ environment: { NODE_ENV: "development", DATABASE_URL: "postgresql://local", ...localSupabase, ...localOpenAI } }),
+      loadConfiguration({
+        environment: {
+          NODE_ENV: "development",
+          DATABASE_URL: "postgresql://local",
+          ...localSupabase,
+          ...localOpenAI,
+        },
+      }),
       /JWT_SECRET is required/,
     );
   });
 
   it("requires an OpenAI key and validates model configuration", async () => {
-    const base = { NODE_ENV: "development", DATABASE_URL: "postgresql://local", JWT_SECRET: jwtSecret, ...localSupabase };
+    const base = {
+      NODE_ENV: "development",
+      DATABASE_URL: "postgresql://local",
+      JWT_SECRET: jwtSecret,
+      ...localSupabase,
+    };
     await assert.rejects(loadConfiguration({ environment: base }), /OPENAI_API_KEY is required/);
     await assert.rejects(
-      loadConfiguration({ environment: { ...base, ...localOpenAI, OPENAI_MODEL: "invalid model name" } }),
+      loadConfiguration({
+        environment: { ...base, ...localOpenAI, OPENAI_MODEL: "invalid model name" },
+      }),
       /OPENAI_MODEL is invalid/,
     );
   });
 
   it("fails production startup when a required vault secret is missing", async () => {
-    const secretLoader: SecretLoader = { load: async () => ({ ...vaultSecrets, "JWT-SECRET": "" }) };
-    await assert.rejects(loadConfiguration({ environment: productionEnvironment, secretLoader }), /JWT_SECRET is required/);
+    const secretLoader: SecretLoader = {
+      load: async () => ({ ...vaultSecrets, "JWT-SECRET": "" }),
+    };
+    await assert.rejects(
+      loadConfiguration({ environment: productionEnvironment, secretLoader }),
+      /JWT_SECRET is required/,
+    );
   });
 
   it("does not permit environment secrets as a production fallback", async () => {
     await assert.rejects(
-      loadConfiguration({ environment: { ...productionEnvironment, SECRET_SOURCE: "environment" } }),
+      loadConfiguration({
+        environment: { ...productionEnvironment, SECRET_SOURCE: "environment" },
+      }),
       /Production must use Azure Key Vault/,
     );
   });
@@ -93,7 +128,10 @@ describe("Azure Key Vault adapter", () => {
   it("can be tested without Azure and retrieves every secret exactly once", async () => {
     const calls: string[] = [];
     const reader = {
-      getSecret: async (name: string) => { calls.push(name); return { value: `value-for-${name}` }; },
+      getSecret: async (name: string) => {
+        calls.push(name);
+        return { value: `value-for-${name}` };
+      },
     };
     const loader = new AzureKeyVaultSecretLoader("https://helpdesk.vault.azure.net", reader);
     const names = ["DATABASE-URL", "JWT-SECRET"];
@@ -104,8 +142,13 @@ describe("Azure Key Vault adapter", () => {
 
   it("reports the failed secret name without exposing other secret values", async () => {
     const loader = new AzureKeyVaultSecretLoader("https://helpdesk.vault.azure.net", {
-      getSecret: async () => { throw new Error("access denied"); },
+      getSecret: async () => {
+        throw new Error("access denied");
+      },
     });
-    await assert.rejects(loader.load(["JWT-SECRET"]), /Failed to load required Key Vault secret JWT-SECRET: access denied/);
+    await assert.rejects(
+      loader.load(["JWT-SECRET"]),
+      /Failed to load required Key Vault secret JWT-SECRET: access denied/,
+    );
   });
 });

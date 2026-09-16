@@ -22,19 +22,37 @@ describe("technician comment authorization", () => {
   before(async () => {
     await prisma.user.createMany({
       data: [
-        { id: studentId, email: `comment-test-student-${studentId}@au.edu`, displayName: "Comment Test Student", role: UserRole.STUDENT },
-        { id: assignedTechnicianId, email: `comment-test-tech1-${assignedTechnicianId}@au.edu`, displayName: "Assigned Comment Technician", role: UserRole.TECHNICIAN },
-        { id: unrelatedTechnicianId, email: `comment-test-tech2-${unrelatedTechnicianId}@au.edu`, displayName: "Unrelated Comment Technician", role: UserRole.TECHNICIAN },
+        {
+          id: studentId,
+          email: `comment-test-student-${studentId}@au.edu`,
+          displayName: "Comment Test Student",
+          role: UserRole.STUDENT,
+        },
+        {
+          id: assignedTechnicianId,
+          email: `comment-test-tech1-${assignedTechnicianId}@au.edu`,
+          displayName: "Assigned Comment Technician",
+          role: UserRole.TECHNICIAN,
+        },
+        {
+          id: unrelatedTechnicianId,
+          email: `comment-test-tech2-${unrelatedTechnicianId}@au.edu`,
+          displayName: "Unrelated Comment Technician",
+          role: UserRole.TECHNICIAN,
+        },
       ],
     });
-    await prisma.category.create({ data: { id: categoryId, name: `Technician comment test ${randomUUID()}` } });
+    await prisma.category.create({
+      data: { id: categoryId, name: `Technician comment test ${randomUUID()}` },
+    });
     await prisma.ticket.createMany({
       data: [
         {
           id: unassignedTicketId,
           creatorId: studentId,
           title: "Unassigned technician comment test",
-          description: "An unassigned OPEN queue ticket for technician comment authorization testing.",
+          description:
+            "An unassigned OPEN queue ticket for technician comment authorization testing.",
           categoryId,
           categorySource: CategorySource.USER_SELECTED,
           status: TicketStatus.OPEN,
@@ -53,16 +71,28 @@ describe("technician comment authorization", () => {
     });
     await prisma.comment.createMany({
       data: [
-        { ticketId: unassignedTicketId, authorId: studentId, body: "Requester comment on the queue ticket." },
-        { ticketId: assignedTicketId, authorId: studentId, body: "Requester comment on the assigned ticket." },
+        {
+          ticketId: unassignedTicketId,
+          authorId: studentId,
+          body: "Requester comment on the queue ticket.",
+        },
+        {
+          ticketId: assignedTicketId,
+          authorId: studentId,
+          body: "Requester comment on the assigned ticket.",
+        },
       ],
     });
   });
 
   after(async () => {
-    await prisma.ticket.deleteMany({ where: { id: { in: [unassignedTicketId, assignedTicketId] } } });
+    await prisma.ticket.deleteMany({
+      where: { id: { in: [unassignedTicketId, assignedTicketId] } },
+    });
     await prisma.category.deleteMany({ where: { id: categoryId } });
-    await prisma.user.deleteMany({ where: { id: { in: [studentId, assignedTechnicianId, unrelatedTechnicianId] } } });
+    await prisma.user.deleteMany({
+      where: { id: { in: [studentId, assignedTechnicianId, unrelatedTechnicianId] } },
+    });
     await prisma.$disconnect();
   });
 
@@ -81,19 +111,25 @@ describe("technician comment authorization", () => {
   it("hides comments from an unrelated technician", async () => {
     await assert.rejects(
       service.listComments(assignedTicketId, unrelatedTechnicianId),
-      (error) => error instanceof HttpError && error.status === 404 && error.code === "TICKET_NOT_FOUND",
+      (error) =>
+        error instanceof HttpError && error.status === 404 && error.code === "TICKET_NOT_FOUND",
     );
   });
 
   it("does not allow a technician to comment before claiming", async () => {
     await assert.rejects(
       service.addComment(unassignedTicketId, unrelatedTechnicianId, "This must not be written."),
-      (error) => error instanceof HttpError && error.status === 404 && error.code === "TICKET_NOT_FOUND",
+      (error) =>
+        error instanceof HttpError && error.status === 404 && error.code === "TICKET_NOT_FOUND",
     );
   });
 
   it("allows the assigned technician to add a comment", async () => {
-    const comment = await service.addComment(assignedTicketId, assignedTechnicianId, "Assigned technician response.");
+    const comment = await service.addComment(
+      assignedTicketId,
+      assignedTechnicianId,
+      "Assigned technician response.",
+    );
     assert.equal(comment.authorId, assignedTechnicianId);
     assert.equal(comment.body, "Assigned technician response.");
   });

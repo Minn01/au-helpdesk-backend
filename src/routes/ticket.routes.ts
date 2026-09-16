@@ -29,11 +29,20 @@ export const createTicketRouter = (
   const requesterOnly = requireAnyRole(UserRole.STUDENT, UserRole.FACULTY);
   const technicianOnly = requireAnyRole(UserRole.TECHNICIAN);
   const ticketUser = requireAnyRole(UserRole.STUDENT, UserRole.FACULTY, UserRole.TECHNICIAN);
-  const attachmentUser = requireAnyRole(UserRole.STUDENT, UserRole.FACULTY, UserRole.TECHNICIAN, UserRole.ADMIN);
-  const dispatch = (requesterHandler: typeof requester.getOne, technicianHandler: typeof technician.getOne) =>
-    ((request, response, next) => request.user!.role === UserRole.TECHNICIAN
-      ? technicianHandler(request, response, next)
-      : requesterHandler(request, response, next)) satisfies typeof requester.getOne;
+  const attachmentUser = requireAnyRole(
+    UserRole.STUDENT,
+    UserRole.FACULTY,
+    UserRole.TECHNICIAN,
+    UserRole.ADMIN,
+  );
+  const dispatch = (
+    requesterHandler: typeof requester.getOne,
+    technicianHandler: typeof technician.getOne,
+  ) =>
+    ((request, response, next) =>
+      request.user!.role === UserRole.TECHNICIAN
+        ? technicianHandler(request, response, next)
+        : requesterHandler(request, response, next)) satisfies typeof requester.getOne;
 
   router.use(createRequireAuth(users, sessions));
   router.get("/queue", technicianOnly, technician.listQueue);
@@ -48,9 +57,21 @@ export const createTicketRouter = (
   router.get("/:ticketId/attachments/:attachmentId/url", attachmentUser, attachment.createUrl);
   router.delete("/:ticketId/attachments/:attachmentId", attachmentUser, attachment.remove);
   if (educore) router.get("/:ticketId/educore-context", attachmentUser, educore.get);
-  router.get("/:ticketId/comments", ticketUser, dispatch(requester.listComments, technician.listComments));
-  router.post("/:ticketId/comments", ticketUser, dispatch(requester.addComment, technician.addComment));
-  router.get("/:ticketId/activity", ticketUser, dispatch(requester.listActivity, technician.listActivity));
+  router.get(
+    "/:ticketId/comments",
+    ticketUser,
+    dispatch(requester.listComments, technician.listComments),
+  );
+  router.post(
+    "/:ticketId/comments",
+    ticketUser,
+    dispatch(requester.addComment, technician.addComment),
+  );
+  router.get(
+    "/:ticketId/activity",
+    ticketUser,
+    dispatch(requester.listActivity, technician.listActivity),
+  );
   router.post("/:ticketId/cancel", requesterOnly, requester.cancel);
   router.get("/:ticketId", ticketUser, dispatch(requester.getOne, technician.getOne));
   router.patch("/:ticketId", requesterOnly, requester.update);

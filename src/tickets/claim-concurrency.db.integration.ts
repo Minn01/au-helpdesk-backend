@@ -3,7 +3,13 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { CategorySource, PrismaClient, TicketPriority, TicketStatus, UserRole } from "../../generated/prisma/client.js";
+import {
+  CategorySource,
+  PrismaClient,
+  TicketPriority,
+  TicketStatus,
+  UserRole,
+} from "../../generated/prisma/client.js";
 import { HttpError } from "../errors/http-error.js";
 import { createPrismaClient } from "../lib/prisma.js";
 import { TechnicianTicketService } from "../services/technician-ticket.service.js";
@@ -23,9 +29,24 @@ describe("concurrent technician claiming", () => {
   before(async () => {
     await prisma.user.createMany({
       data: [
-        { id: studentId, email: `claim-test-student-${studentId}@au.edu`, displayName: "Claim Test Student", role: UserRole.STUDENT },
-        { id: technicianIds[0], email: `claim-test-tech1-${technicianIds[0]}@au.edu`, displayName: "Claim Test Technician One", role: UserRole.TECHNICIAN },
-        { id: technicianIds[1], email: `claim-test-tech2-${technicianIds[1]}@au.edu`, displayName: "Claim Test Technician Two", role: UserRole.TECHNICIAN },
+        {
+          id: studentId,
+          email: `claim-test-student-${studentId}@au.edu`,
+          displayName: "Claim Test Student",
+          role: UserRole.STUDENT,
+        },
+        {
+          id: technicianIds[0],
+          email: `claim-test-tech1-${technicianIds[0]}@au.edu`,
+          displayName: "Claim Test Technician One",
+          role: UserRole.TECHNICIAN,
+        },
+        {
+          id: technicianIds[1],
+          email: `claim-test-tech2-${technicianIds[1]}@au.edu`,
+          displayName: "Claim Test Technician Two",
+          role: UserRole.TECHNICIAN,
+        },
       ],
     });
     const category = await prisma.category.create({
@@ -41,7 +62,8 @@ describe("concurrent technician claiming", () => {
       data: {
         creatorId: studentId,
         title: "Concurrency claim integration test",
-        description: "Temporary ticket used to prove that exactly one simultaneous technician claim succeeds.",
+        description:
+          "Temporary ticket used to prove that exactly one simultaneous technician claim succeeds.",
         categoryId: category.id,
         categorySource: CategorySource.USER_SELECTED,
         priority: TicketPriority.MEDIUM,
@@ -59,7 +81,11 @@ describe("concurrent technician claiming", () => {
 
   after(async () => {
     if (ticketId) await prisma.ticket.deleteMany({ where: { id: ticketId } });
-    await prisma.category.deleteMany({ where: { id: { in: [otherCategoryId, overrideCategoryId].filter((id): id is string => Boolean(id)) } } });
+    await prisma.category.deleteMany({
+      where: {
+        id: { in: [otherCategoryId, overrideCategoryId].filter((id): id is string => Boolean(id)) },
+      },
+    });
     await prisma.user.deleteMany({ where: { id: { in: [studentId, ...technicianIds] } } });
     await competitorOne.$disconnect();
     await competitorTwo.$disconnect();
@@ -93,7 +119,9 @@ describe("concurrent technician claiming", () => {
       },
     });
     assert.equal(ticket.status, TicketStatus.CLAIMED);
-    assert.ok(technicianIds.includes(ticket.assignedTechnicianId as typeof technicianIds[number]));
+    assert.ok(
+      technicianIds.includes(ticket.assignedTechnicianId as (typeof technicianIds)[number]),
+    );
     assert.equal(ticket.assignments.length, 1);
     assert.equal(ticket.activities.length, 1);
 
@@ -113,7 +141,11 @@ describe("concurrent technician claiming", () => {
     assert.equal(classified.aiSuggestedCategoryId, otherCategoryId);
     assert.equal(classified.aiSuggestedPriority, TicketPriority.LOW);
 
-    const comment = await service.addComment(ticketId, winnerId, "Technician lifecycle integration comment.");
+    const comment = await service.addComment(
+      ticketId,
+      winnerId,
+      "Technician lifecycle integration comment.",
+    );
     assert.equal(comment.authorId, winnerId);
 
     const resolved = await service.resolve(ticketId, winnerId);

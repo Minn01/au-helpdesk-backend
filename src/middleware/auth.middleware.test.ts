@@ -27,10 +27,7 @@ describe("role middleware", () => {
     const request = {
       user: { role: UserRole.TECHNICIAN },
     } as Request;
-    assert.equal(
-      run(requireAnyRole(UserRole.TECHNICIAN, UserRole.ADMIN), request),
-      undefined,
-    );
+    assert.equal(run(requireAnyRole(UserRole.TECHNICIAN, UserRole.ADMIN), request), undefined);
   });
 
   it("returns forbidden for the wrong role", () => {

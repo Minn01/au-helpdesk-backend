@@ -9,7 +9,10 @@ import { createSessionService } from "./session.service.js";
 
 const unusedCategories = { listActive: async () => [] };
 const unusedTickets = {
-  listMine: async () => ({ tickets: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } }),
+  listMine: async () => ({
+    tickets: [],
+    pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+  }),
   getOwnedDetails: async () => ({ activities: [] }) as never,
   create: async () => ({}) as never,
   update: async () => ({}) as never,
@@ -18,8 +21,14 @@ const unusedTickets = {
   addComment: async () => ({}) as never,
 };
 const unusedTechnicianTickets = {
-  listQueue: async () => ({ tickets: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } }),
-  listAssigned: async () => ({ tickets: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } }),
+  listQueue: async () => ({
+    tickets: [],
+    pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+  }),
+  listAssigned: async () => ({
+    tickets: [],
+    pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+  }),
   getRelevantDetails: async () => ({ activities: [] }) as never,
   claim: async () => ({}) as never,
   start: async () => ({}) as never,
@@ -76,7 +85,7 @@ describe("session authentication", () => {
 
   after(async () => {
     await new Promise<void>((resolve, reject) => {
-      server.close((error) => error ? reject(error) : resolve());
+      server.close((error) => (error ? reject(error) : resolve()));
     });
   });
 
@@ -101,7 +110,7 @@ describe("session authentication", () => {
       headers: { cookie: `helpdesk_session=${token}` },
     });
     assert.equal(response.status, 403);
-    assert.equal((await response.json() as { error: string }).error, "ACCOUNT_INACTIVE");
+    assert.equal(((await response.json()) as { error: string }).error, "ACCOUNT_INACTIVE");
   });
 
   it("does not expose the removed development login route", async () => {

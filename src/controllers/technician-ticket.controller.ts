@@ -9,7 +9,8 @@ import {
 } from "../validation/technician.validation.js";
 
 const userId = (request: Parameters<RequestHandler>[0]) => request.user!.id;
-const ticketId = (request: Parameters<RequestHandler>[0]) => parseUuid(request.params.ticketId, "ticketId");
+const ticketId = (request: Parameters<RequestHandler>[0]) =>
+  parseUuid(request.params.ticketId, "ticketId");
 
 export const createTechnicianTicketController = (tickets: TechnicianTicketApi) => ({
   listQueue: (async (request, response, next) => {
@@ -22,7 +23,9 @@ export const createTechnicianTicketController = (tickets: TechnicianTicketApi) =
 
   listAssigned: (async (request, response, next) => {
     try {
-      response.status(200).json(await tickets.listAssigned(userId(request), parseAssignedQuery(request.query)));
+      response
+        .status(200)
+        .json(await tickets.listAssigned(userId(request), parseAssignedQuery(request.query)));
     } catch (error) {
       next(error);
     }
@@ -30,7 +33,9 @@ export const createTechnicianTicketController = (tickets: TechnicianTicketApi) =
 
   getOne: (async (request, response, next) => {
     try {
-      response.status(200).json({ ticket: await tickets.getRelevantDetails(ticketId(request), userId(request)) });
+      response
+        .status(200)
+        .json({ ticket: await tickets.getRelevantDetails(ticketId(request), userId(request)) });
     } catch (error) {
       next(error);
     }
@@ -38,7 +43,9 @@ export const createTechnicianTicketController = (tickets: TechnicianTicketApi) =
 
   claim: (async (request, response, next) => {
     try {
-      response.status(200).json({ ticket: await tickets.claim(ticketId(request), userId(request)) });
+      response
+        .status(200)
+        .json({ ticket: await tickets.claim(ticketId(request), userId(request)) });
     } catch (error) {
       next(error);
     }
@@ -46,7 +53,9 @@ export const createTechnicianTicketController = (tickets: TechnicianTicketApi) =
 
   start: (async (request, response, next) => {
     try {
-      response.status(200).json({ ticket: await tickets.start(ticketId(request), userId(request)) });
+      response
+        .status(200)
+        .json({ ticket: await tickets.start(ticketId(request), userId(request)) });
     } catch (error) {
       next(error);
     }
@@ -54,7 +63,9 @@ export const createTechnicianTicketController = (tickets: TechnicianTicketApi) =
 
   resolve: (async (request, response, next) => {
     try {
-      response.status(200).json({ ticket: await tickets.resolve(ticketId(request), userId(request)) });
+      response
+        .status(200)
+        .json({ ticket: await tickets.resolve(ticketId(request), userId(request)) });
     } catch (error) {
       next(error);
     }
@@ -75,7 +86,9 @@ export const createTechnicianTicketController = (tickets: TechnicianTicketApi) =
 
   listComments: (async (request, response, next) => {
     try {
-      response.status(200).json({ comments: await tickets.listComments(ticketId(request), userId(request)) });
+      response
+        .status(200)
+        .json({ comments: await tickets.listComments(ticketId(request), userId(request)) });
     } catch (error) {
       next(error);
     }

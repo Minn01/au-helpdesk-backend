@@ -45,39 +45,51 @@ const detailInclude = {
       assignedBy: { select: userSelect },
     },
   },
-  activities: { orderBy: { createdAt: "asc" as const }, include: { actor: { select: userSelect } } },
+  activities: {
+    orderBy: { createdAt: "asc" as const },
+    include: { actor: { select: userSelect } },
+  },
 } as const;
 
-const searchWhere = (search: string | undefined): Prisma.TicketWhereInput => search ? {
-  OR: [
-    { ticketNumber: { contains: search, mode: "insensitive" } },
-    { title: { contains: search, mode: "insensitive" } },
-    { description: { contains: search, mode: "insensitive" } },
-    { location: { contains: search, mode: "insensitive" } },
-  ],
-} : {};
+const searchWhere = (search: string | undefined): Prisma.TicketWhereInput =>
+  search
+    ? {
+        OR: [
+          { ticketNumber: { contains: search, mode: "insensitive" } },
+          { title: { contains: search, mode: "insensitive" } },
+          { description: { contains: search, mode: "insensitive" } },
+          { location: { contains: search, mode: "insensitive" } },
+        ],
+      }
+    : {};
 
 export class TechnicianTicketService {
   constructor(private readonly database: PrismaClient) {}
 
   listQueue(filters: MineFilters) {
-    return this.list({
-      status: TicketStatus.OPEN,
-      assignedTechnicianId: null,
-      ...(filters.priority ? { priority: filters.priority } : {}),
-      ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
-      ...searchWhere(filters.search),
-    }, filters);
+    return this.list(
+      {
+        status: TicketStatus.OPEN,
+        assignedTechnicianId: null,
+        ...(filters.priority ? { priority: filters.priority } : {}),
+        ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+        ...searchWhere(filters.search),
+      },
+      filters,
+    );
   }
 
   listAssigned(technicianId: string, filters: MineFilters) {
-    return this.list({
-      assignedTechnicianId: technicianId,
-      ...(filters.status ? { status: filters.status } : {}),
-      ...(filters.priority ? { priority: filters.priority } : {}),
-      ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
-      ...searchWhere(filters.search),
-    }, filters);
+    return this.list(
+      {
+        assignedTechnicianId: technicianId,
+        ...(filters.status ? { status: filters.status } : {}),
+        ...(filters.priority ? { priority: filters.priority } : {}),
+        ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+        ...searchWhere(filters.search),
+      },
+      filters,
+    );
   }
 
   async getRelevantDetails(ticketId: string, technicianId: string) {
@@ -114,7 +126,10 @@ export class TechnicianTicketService {
           metadata: { fromStatus: TicketStatus.OPEN, toStatus: TicketStatus.CLAIMED, technicianId },
         },
       });
-      return transaction.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: detailInclude });
+      return transaction.ticket.findUniqueOrThrow({
+        where: { id: ticketId },
+        include: detailInclude,
+      });
     });
   }
 
@@ -136,7 +151,8 @@ export class TechnicianTicketService {
         where: { id: input.categoryId, isActive: true },
         select: { id: true },
       });
-      if (!category) throw new HttpError(400, "INVALID_CATEGORY", "Category is not active or does not exist");
+      if (!category)
+        throw new HttpError(400, "INVALID_CATEGORY", "Category is not active or does not exist");
     }
     return this.database.$transaction(async (transaction) => {
       await this.assertActiveTechnician(transaction, technicianId);
@@ -149,7 +165,11 @@ export class TechnicianTicketService {
         select: { id: true, categoryId: true, priority: true },
       });
       if (!current) {
-        throw new HttpError(409, "TICKET_NOT_EDITABLE", "Only assigned active tickets can be reclassified");
+        throw new HttpError(
+          409,
+          "TICKET_NOT_EDITABLE",
+          "Only assigned active tickets can be reclassified",
+        );
       }
       const result = await transaction.ticket.updateMany({
         where: {
@@ -158,12 +178,18 @@ export class TechnicianTicketService {
           status: { in: [TicketStatus.CLAIMED, TicketStatus.IN_PROGRESS] },
         },
         data: {
-          ...(input.categoryId ? { categoryId: input.categoryId, categorySource: CategorySource.TECHNICIAN_OVERRIDE } : {}),
+          ...(input.categoryId
+            ? { categoryId: input.categoryId, categorySource: CategorySource.TECHNICIAN_OVERRIDE }
+            : {}),
           ...(input.priority ? { priority: input.priority } : {}),
         },
       });
       if (result.count !== 1) {
-        throw new HttpError(409, "TICKET_NOT_EDITABLE", "Only assigned active tickets can be reclassified");
+        throw new HttpError(
+          409,
+          "TICKET_NOT_EDITABLE",
+          "Only assigned active tickets can be reclassified",
+        );
       }
       await transaction.ticketActivity.create({
         data: {
@@ -179,7 +205,10 @@ export class TechnicianTicketService {
           },
         },
       });
-      return transaction.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: detailInclude });
+      return transaction.ticket.findUniqueOrThrow({
+        where: { id: ticketId },
+        include: detailInclude,
+      });
     });
   }
 
@@ -255,7 +284,11 @@ export class TechnicianTicketService {
         },
       });
       if (result.count !== 1) {
-        throw new HttpError(409, "INVALID_TICKET_TRANSITION", `Ticket must be ${fromStatus} and assigned to you`);
+        throw new HttpError(
+          409,
+          "INVALID_TICKET_TRANSITION",
+          `Ticket must be ${fromStatus} and assigned to you`,
+        );
       }
       await transaction.ticketActivity.create({
         data: {
@@ -266,7 +299,10 @@ export class TechnicianTicketService {
           metadata: { fromStatus, toStatus },
         },
       });
-      return transaction.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: detailInclude });
+      return transaction.ticket.findUniqueOrThrow({
+        where: { id: ticketId },
+        include: detailInclude,
+      });
     });
   }
 
@@ -278,12 +314,16 @@ export class TechnicianTicketService {
     if (!ticket) throw new HttpError(404, "TICKET_NOT_FOUND", "Ticket not found");
   }
 
-  private async assertActiveTechnician(transaction: Prisma.TransactionClient, technicianId: string) {
+  private async assertActiveTechnician(
+    transaction: Prisma.TransactionClient,
+    technicianId: string,
+  ) {
     const technician = await transaction.user.findFirst({
       where: { id: technicianId, role: UserRole.TECHNICIAN, isActive: true },
       select: { id: true },
     });
-    if (!technician) throw new HttpError(403, "FORBIDDEN", "An active technician account is required");
+    if (!technician)
+      throw new HttpError(403, "FORBIDDEN", "An active technician account is required");
   }
 }
 

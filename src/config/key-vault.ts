@@ -12,7 +12,9 @@ export const KEY_VAULT_SECRET_NAMES = {
   OPENAI_API_KEY: "OPENAI-API-KEY",
 } as const;
 
-export type SecretLoader = { load(secretNames: readonly string[]): Promise<Record<string, string>> };
+export type SecretLoader = {
+  load(secretNames: readonly string[]): Promise<Record<string, string>>;
+};
 type SecretReader = { getSecret(name: string): Promise<{ value?: string | undefined }> };
 
 export class AzureKeyVaultSecretLoader implements SecretLoader {
@@ -21,7 +23,8 @@ export class AzureKeyVaultSecretLoader implements SecretLoader {
   constructor(vaultUrl: string, client?: SecretReader) {
     try {
       const url = new URL(vaultUrl);
-      if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) throw new Error();
+      if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash)
+        throw new Error();
     } catch {
       throw new Error("AZURE_KEY_VAULT_URL must be a valid HTTPS URL");
     }
@@ -29,16 +32,20 @@ export class AzureKeyVaultSecretLoader implements SecretLoader {
   }
 
   async load(secretNames: readonly string[]): Promise<Record<string, string>> {
-    const entries = await Promise.all(secretNames.map(async (name) => {
-      try {
-        const secret = await this.client.getSecret(name);
-        if (!secret.value) throw new Error("secret has no value");
-        return [name, secret.value] as const;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "unknown Azure error";
-        throw new Error(`Failed to load required Key Vault secret ${name}: ${message}`, { cause: error });
-      }
-    }));
+    const entries = await Promise.all(
+      secretNames.map(async (name) => {
+        try {
+          const secret = await this.client.getSecret(name);
+          if (!secret.value) throw new Error("secret has no value");
+          return [name, secret.value] as const;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "unknown Azure error";
+          throw new Error(`Failed to load required Key Vault secret ${name}: ${message}`, {
+            cause: error,
+          });
+        }
+      }),
+    );
     return Object.fromEntries(entries);
   }
 }

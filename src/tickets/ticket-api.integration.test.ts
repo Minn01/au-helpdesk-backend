@@ -44,7 +44,7 @@ const assertOwner = (ticketId: string, creatorId: string) => {
 
 const tickets: TicketApi = {
   listMine: async (creatorId, filters) => ({
-    tickets: creatorId === owner.id ? [{ id: ownedTicketId }] as never : [],
+    tickets: creatorId === owner.id ? ([{ id: ownedTicketId }] as never) : [],
     pagination: { page: filters.page, pageSize: filters.pageSize, total: 1, totalPages: 1 },
   }),
   getOwnedDetails: async (ticketId, creatorId) => {
@@ -71,10 +71,18 @@ const tickets: TicketApi = {
 };
 
 const technicianTickets = {
-  listQueue: async () => ({ tickets: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } }),
-  listAssigned: async () => ({ tickets: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } }),
+  listQueue: async () => ({
+    tickets: [],
+    pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+  }),
+  listAssigned: async () => ({
+    tickets: [],
+    pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+  }),
   getRelevantDetails: async () => ({ activities: [] }) as never,
-  claim: async () => { throw new HttpError(409, "TICKET_NOT_CLAIMABLE", "Ticket is no longer available to claim"); },
+  claim: async () => {
+    throw new HttpError(409, "TICKET_NOT_CLAIMABLE", "Ticket is no longer available to claim");
+  },
   start: async () => ({}) as never,
   resolve: async () => ({}) as never,
   updateClassification: async () => ({}) as never,
@@ -99,7 +107,8 @@ const start = async () => {
   return { server, baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}` };
 };
 
-const cookieFor = (user: AuthUser) => `helpdesk_session=${createSessionService(secret).createToken(user.id)}`;
+const cookieFor = (user: AuthUser) =>
+  `helpdesk_session=${createSessionService(secret).createToken(user.id)}`;
 
 describe("requester ticket API security", () => {
   let server: Server;
@@ -110,7 +119,9 @@ describe("requester ticket API security", () => {
   });
 
   after(async () => {
-    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
   });
 
   it("allows the owning student to view a ticket", async () => {
@@ -125,7 +136,7 @@ describe("requester ticket API security", () => {
       headers: { cookie: cookieFor(otherStudent) },
     });
     assert.equal(response.status, 404);
-    assert.equal((await response.json() as { error: string }).error, "TICKET_NOT_FOUND");
+    assert.equal(((await response.json()) as { error: string }).error, "TICKET_NOT_FOUND");
   });
 
   it("blocks technician access to requester-only routes", async () => {
@@ -164,6 +175,6 @@ describe("requester ticket API security", () => {
       }),
     });
     assert.equal(response.status, 400);
-    assert.equal((await response.json() as { error: string }).error, "VALIDATION_ERROR");
+    assert.equal(((await response.json()) as { error: string }).error, "VALIDATION_ERROR");
   });
 });

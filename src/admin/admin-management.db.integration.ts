@@ -2,7 +2,12 @@ import "dotenv/config";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
-import { CategorySource, TicketPriority, TicketStatus, UserRole } from "../../generated/prisma/client.js";
+import {
+  CategorySource,
+  TicketPriority,
+  TicketStatus,
+  UserRole,
+} from "../../generated/prisma/client.js";
 import { HttpError } from "../errors/http-error.js";
 import { createPrismaClient } from "../lib/prisma.js";
 import { AdminManagementService } from "../services/admin-management.service.js";
@@ -31,15 +36,43 @@ describe("admin management database behavior", () => {
   before(async () => {
     await prisma.user.createMany({
       data: [
-        { id: ids.student, email: `admin-test-student-${ids.student}@au.edu`, displayName: "Admin Test Student", role: UserRole.STUDENT },
-        { id: ids.admin, email: `admin-test-admin-${ids.admin}@au.edu`, displayName: "Admin Test Admin", role: UserRole.ADMIN },
-        { id: ids.technicianOne, email: `admin-test-tech1-${ids.technicianOne}@au.edu`, displayName: "Admin Test Technician One", role: UserRole.TECHNICIAN },
-        { id: ids.technicianTwo, email: `admin-test-tech2-${ids.technicianTwo}@au.edu`, displayName: "Admin Test Technician Two", role: UserRole.TECHNICIAN },
-        { id: temporaryUserId, email: `admin-test-temporary-${temporaryUserId}@au.edu`, displayName: "Admin Test Temporary User", role: UserRole.STUDENT },
+        {
+          id: ids.student,
+          email: `admin-test-student-${ids.student}@au.edu`,
+          displayName: "Admin Test Student",
+          role: UserRole.STUDENT,
+        },
+        {
+          id: ids.admin,
+          email: `admin-test-admin-${ids.admin}@au.edu`,
+          displayName: "Admin Test Admin",
+          role: UserRole.ADMIN,
+        },
+        {
+          id: ids.technicianOne,
+          email: `admin-test-tech1-${ids.technicianOne}@au.edu`,
+          displayName: "Admin Test Technician One",
+          role: UserRole.TECHNICIAN,
+        },
+        {
+          id: ids.technicianTwo,
+          email: `admin-test-tech2-${ids.technicianTwo}@au.edu`,
+          displayName: "Admin Test Technician Two",
+          role: UserRole.TECHNICIAN,
+        },
+        {
+          id: temporaryUserId,
+          email: `admin-test-temporary-${temporaryUserId}@au.edu`,
+          displayName: "Admin Test Temporary User",
+          role: UserRole.STUDENT,
+        },
       ],
     });
     const category = await prisma.category.create({
-      data: { name: `Admin test fixture ${randomUUID()}`, description: "Isolated integration-test category" },
+      data: {
+        name: `Admin test fixture ${randomUUID()}`,
+        description: "Isolated integration-test category",
+      },
       select: { id: true },
     });
     fixtureCategoryId = category.id;
@@ -61,12 +94,16 @@ describe("admin management database behavior", () => {
   after(async () => {
     if (ticketId) await prisma.ticket.deleteMany({ where: { id: ticketId } });
     if (categoryName) {
-      await prisma.category.deleteMany({ where: { name: { equals: categoryName, mode: "insensitive" } } });
+      await prisma.category.deleteMany({
+        where: { name: { equals: categoryName, mode: "insensitive" } },
+      });
     } else if (categoryId) {
       await prisma.category.deleteMany({ where: { id: categoryId } });
     }
     if (fixtureCategoryId) await prisma.category.deleteMany({ where: { id: fixtureCategoryId } });
-    await prisma.user.deleteMany({ where: { id: { in: [...Object.values(ids), temporaryUserId] } } });
+    await prisma.user.deleteMany({
+      where: { id: { in: [...Object.values(ids), temporaryUserId] } },
+    });
     await prisma.$disconnect();
   });
 
@@ -83,7 +120,10 @@ describe("admin management database behavior", () => {
     assert.equal(ticket.assignments.length, 2);
     assert.ok(ticket.assignments[0]?.unassignedAt);
     assert.equal(ticket.assignments[1]?.unassignedAt, null);
-    assert.deepEqual(ticket.activities.map((activity) => activity.type).sort(), ["TICKET_ASSIGNED", "TICKET_REASSIGNED"]);
+    assert.deepEqual(ticket.activities.map((activity) => activity.type).sort(), [
+      "TICKET_ASSIGNED",
+      "TICKET_REASSIGNED",
+    ]);
   });
 
   it("enforces case-insensitive category uniqueness and supports disable/re-enable", async () => {
@@ -93,7 +133,10 @@ describe("admin management database behavior", () => {
     categoryId = category.id;
     await assert.rejects(
       management.createCategory({ name: name.toUpperCase(), description: null }),
-      (error) => error instanceof HttpError && error.status === 409 && error.code === "CATEGORY_NAME_CONFLICT",
+      (error) =>
+        error instanceof HttpError &&
+        error.status === 409 &&
+        error.code === "CATEGORY_NAME_CONFLICT",
     );
     assert.equal((await management.setCategoryActive(category.id, false)).isActive, false);
     assert.equal((await management.setCategoryActive(category.id, true)).isActive, true);
@@ -106,7 +149,10 @@ describe("admin management database behavior", () => {
     }
     await assert.rejects(
       management.updateUser(ids.admin, { isActive: false }, ids.admin),
-      (error) => error instanceof HttpError && error.status === 409 && error.code === "SELF_LOCKOUT_PROTECTED",
+      (error) =>
+        error instanceof HttpError &&
+        error.status === 409 &&
+        error.code === "SELF_LOCKOUT_PROTECTED",
     );
   });
 });

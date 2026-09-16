@@ -43,23 +43,56 @@ export class MsalMicrosoftOAuthClient implements MicrosoftOAuthClient {
   }
 
   authorizationUrl(state: string, nonce: string) {
-    return this.client.getAuthCodeUrl({ scopes, redirectUri: this.config.redirectUri, state, nonce, responseMode: "query" });
+    return this.client.getAuthCodeUrl({
+      scopes,
+      redirectUri: this.config.redirectUri,
+      state,
+      nonce,
+      responseMode: "query",
+    });
   }
 
   async exchangeCode(code: string, nonce: string): Promise<MicrosoftIdentity> {
-    const result = await this.client.acquireTokenByCode({ code, scopes, redirectUri: this.config.redirectUri, nonce });
+    const result = await this.client.acquireTokenByCode({
+      code,
+      scopes,
+      redirectUri: this.config.redirectUri,
+      nonce,
+    });
     const claims = result.idTokenClaims as Record<string, unknown> | undefined;
     const tenantId = claims?.tid;
     const objectId = claims?.oid;
     const email = claims?.email ?? claims?.preferred_username ?? result.account?.username;
     const displayName = claims?.name ?? result.account?.name;
-    if (typeof tenantId !== "string" || tenantId.toLowerCase() !== this.config.tenantId.toLowerCase() || typeof objectId !== "string") {
-      throw new HttpError(401, "MICROSOFT_IDENTITY_INVALID", "Microsoft identity could not be verified");
+    if (
+      typeof tenantId !== "string" ||
+      tenantId.toLowerCase() !== this.config.tenantId.toLowerCase() ||
+      typeof objectId !== "string"
+    ) {
+      throw new HttpError(
+        401,
+        "MICROSOFT_IDENTITY_INVALID",
+        "Microsoft identity could not be verified",
+      );
     }
-    if (typeof email !== "string" || !email.includes("@") || typeof displayName !== "string" || !displayName.trim()) {
-      throw new HttpError(401, "MICROSOFT_PROFILE_INCOMPLETE", "Microsoft account profile is missing required information");
+    if (
+      typeof email !== "string" ||
+      !email.includes("@") ||
+      typeof displayName !== "string" ||
+      !displayName.trim()
+    ) {
+      throw new HttpError(
+        401,
+        "MICROSOFT_PROFILE_INCOMPLETE",
+        "Microsoft account profile is missing required information",
+      );
     }
-    return { tenantId, objectId, email: email.trim().toLowerCase(), displayName: displayName.trim() };
+    return {
+      tenantId,
+      objectId,
+      email: email.trim().toLowerCase(),
+      displayName: displayName.trim(),
+    };
   }
 }
 
@@ -69,7 +102,12 @@ export class PrismaMicrosoftUserProvisioner implements MicrosoftUserProvisioner 
   async findOrCreate(identity: MicrosoftIdentity) {
     return this.database.$transaction(async (transaction) => {
       const linked = await transaction.user.findUnique({
-        where: { microsoftTenantId_microsoftObjectId: { microsoftTenantId: identity.tenantId, microsoftObjectId: identity.objectId } },
+        where: {
+          microsoftTenantId_microsoftObjectId: {
+            microsoftTenantId: identity.tenantId,
+            microsoftObjectId: identity.objectId,
+          },
+        },
         select: { id: true, isActive: true },
       });
       if (linked) return linked;
@@ -79,12 +117,20 @@ export class PrismaMicrosoftUserProvisioner implements MicrosoftUserProvisioner 
         select: { id: true, isActive: true, microsoftTenantId: true, microsoftObjectId: true },
       });
       if (existing?.microsoftObjectId || existing?.microsoftTenantId) {
-        throw new HttpError(409, "MICROSOFT_IDENTITY_CONFLICT", "This HelpDesk account is linked to another Microsoft identity");
+        throw new HttpError(
+          409,
+          "MICROSOFT_IDENTITY_CONFLICT",
+          "This HelpDesk account is linked to another Microsoft identity",
+        );
       }
       if (existing) {
         return transaction.user.update({
           where: { id: existing.id },
-          data: { microsoftTenantId: identity.tenantId, microsoftObjectId: identity.objectId, displayName: identity.displayName },
+          data: {
+            microsoftTenantId: identity.tenantId,
+            microsoftObjectId: identity.objectId,
+            displayName: identity.displayName,
+          },
           select: { id: true, isActive: true },
         });
       }

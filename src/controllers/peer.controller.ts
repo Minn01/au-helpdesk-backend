@@ -9,7 +9,9 @@ export const createPeerController = (tickets: PeerTicketApi) => ({
     try {
       const result = await tickets.createFromEduCore(parseEduCoreTicket(request.body));
       response.status(result.created ? 201 : 200).json(result);
-    } catch (error) { next(error); }
+    } catch (error) {
+      next(error);
+    }
   }) satisfies RequestHandler,
 });
 
@@ -18,6 +20,8 @@ export const createEduCoreContextController = (context: EduCoreContextApi) => ({
     try {
       const ticketId = parseUuid(request.params.ticketId, "ticketId");
       response.status(200).json({ context: await context.getForTicket(ticketId, request.user!) });
-    } catch (error) { next(error); }
+    } catch (error) {
+      next(error);
+    }
   }) satisfies RequestHandler,
 });

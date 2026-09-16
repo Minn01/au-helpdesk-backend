@@ -19,9 +19,14 @@ let calls = 0;
 const tickets: PeerTicketApi = {
   createFromEduCore: async (input) => {
     calls += 1;
-    if (input.student.email === "missing@au.edu") throw new HttpError(404, "STUDENT_NOT_FOUND", "No matching student");
+    if (input.student.email === "missing@au.edu")
+      throw new HttpError(404, "STUDENT_NOT_FOUND", "No matching student");
     return {
-      ticket: { id: "30000000-0000-4000-8000-000000000001", ticketNumber: "HD-000123", status: "OPEN" },
+      ticket: {
+        id: "30000000-0000-4000-8000-000000000001",
+        ticketNumber: "HD-000123",
+        status: "OPEN",
+      },
       created: input.eventId !== "replay-event",
     } as never;
   },
@@ -34,8 +39,13 @@ describe("EduCore incoming peer API", () => {
   before(async () => {
     server = await new Promise<Server>((resolve) => {
       const candidate = createApp({
-        users: {} as never, sessions: {} as never, categories: {} as never, tickets: {} as never,
-        technicianTickets: {} as never, adminTickets: {} as never, adminManagement: {} as never,
+        users: {} as never,
+        sessions: {} as never,
+        categories: {} as never,
+        tickets: {} as never,
+        technicianTickets: {} as never,
+        adminTickets: {} as never,
+        adminManagement: {} as never,
         attachments: {} as never,
         peer: { apiKey, tickets, context: {} as never },
         nodeEnv: "test",
@@ -44,18 +54,24 @@ describe("EduCore incoming peer API", () => {
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });
 
-  after(async () => new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())));
+  after(
+    async () =>
+      new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      ),
+  );
 
-  const post = (body: unknown, key?: string) => fetch(`${baseUrl}/api/integrations/educore/tickets`, {
-    method: "POST",
-    headers: { "content-type": "application/json", ...(key ? { "x-api-key": key } : {}) },
-    body: JSON.stringify(body),
-  });
+  const post = (body: unknown, key?: string) =>
+    fetch(`${baseUrl}/api/integrations/educore/tickets`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...(key ? { "x-api-key": key } : {}) },
+      body: JSON.stringify(body),
+    });
 
   it("rejects missing and incorrect x-api-key headers", async () => {
     const missing = await post(payload);
     assert.equal(missing.status, 401);
-    assert.equal((await missing.json() as { error: string }).error, "INVALID_PEER_API_KEY");
+    assert.equal(((await missing.json()) as { error: string }).error, "INVALID_PEER_API_KEY");
     const invalid = await post(payload, "incorrect-peer-key");
     assert.equal(invalid.status, 401);
     assert.equal(calls, 0);
@@ -64,24 +80,34 @@ describe("EduCore incoming peer API", () => {
   it("accepts a valid key and validated payload", async () => {
     const response = await post(payload, apiKey);
     assert.equal(response.status, 201);
-    assert.equal((await response.json() as { created: boolean }).created, true);
+    assert.equal(((await response.json()) as { created: boolean }).created, true);
   });
 
   it("rejects invalid payloads", async () => {
-    const response = await post({ ...payload, eventId: "../unsafe", registrationStatus: "SUCCESS" }, apiKey);
+    const response = await post(
+      { ...payload, eventId: "../unsafe", registrationStatus: "SUCCESS" },
+      apiKey,
+    );
     assert.equal(response.status, 400);
-    assert.equal((await response.json() as { error: string }).error, "VALIDATION_ERROR");
+    assert.equal(((await response.json()) as { error: string }).error, "VALIDATION_ERROR");
   });
 
   it("returns a stable unknown-student error", async () => {
-    const response = await post({ ...payload, eventId: "unknown-student", student: { ...payload.student, email: "missing@au.edu" } }, apiKey);
+    const response = await post(
+      {
+        ...payload,
+        eventId: "unknown-student",
+        student: { ...payload.student, email: "missing@au.edu" },
+      },
+      apiKey,
+    );
     assert.equal(response.status, 404);
-    assert.equal((await response.json() as { error: string }).error, "STUDENT_NOT_FOUND");
+    assert.equal(((await response.json()) as { error: string }).error, "STUDENT_NOT_FOUND");
   });
 
   it("returns 200 and created=false for an idempotent replay", async () => {
     const response = await post({ ...payload, eventId: "replay-event" }, apiKey);
     assert.equal(response.status, 200);
-    assert.equal((await response.json() as { created: boolean }).created, false);
+    assert.equal(((await response.json()) as { created: boolean }).created, false);
   });
 });

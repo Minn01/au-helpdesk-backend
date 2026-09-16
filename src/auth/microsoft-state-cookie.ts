@@ -9,7 +9,11 @@ const options = (isProduction: boolean): CookieOptions => ({
   secure: isProduction,
 });
 
-export const setMicrosoftStateCookie = (response: Response, token: string, isProduction: boolean) => {
+export const setMicrosoftStateCookie = (
+  response: Response,
+  token: string,
+  isProduction: boolean,
+) => {
   response.cookie(MICROSOFT_STATE_COOKIE_NAME, token, options(isProduction));
 };
 

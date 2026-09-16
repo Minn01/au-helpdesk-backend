@@ -44,7 +44,7 @@ describe("Microsoft application authentication", () => {
     server = await new Promise<Server>((resolve) => {
       const candidate = createApp({
         attachments: {} as never,
-        users: { findById: async (id) => id === activeUser.id ? activeUser : null },
+        users: { findById: async (id) => (id === activeUser.id ? activeUser : null) },
         sessions,
         categories: { listActive: async () => [] },
         tickets: {} as never,
@@ -77,12 +77,20 @@ describe("Microsoft application authentication", () => {
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });
 
-  after(async () => new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())));
+  after(
+    async () =>
+      new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      ),
+  );
 
   const begin = async () => {
     const response = await fetch(`${baseUrl}/api/auth/microsoft`, { redirect: "manual" });
     assert.equal(response.status, 302);
-    assert.match(response.headers.get("location") ?? "", /^https:\/\/login\.microsoftonline\.com\//);
+    assert.match(
+      response.headers.get("location") ?? "",
+      /^https:\/\/login\.microsoftonline\.com\//,
+    );
     const cookie = response.headers.get("set-cookie")?.split(";", 1)[0];
     assert.ok(cookie);
     return cookie;
@@ -90,21 +98,29 @@ describe("Microsoft application authentication", () => {
 
   it("validates state, establishes the HelpDesk session, restores it, and logs out", async () => {
     const stateCookie = await begin();
-    const callback = await fetch(`${baseUrl}/api/auth/microsoft/callback?code=valid-code&state=${encodeURIComponent(issuedState)}`, {
-      headers: { cookie: stateCookie },
-      redirect: "manual",
-    });
+    const callback = await fetch(
+      `${baseUrl}/api/auth/microsoft/callback?code=valid-code&state=${encodeURIComponent(issuedState)}`,
+      {
+        headers: { cookie: stateCookie },
+        redirect: "manual",
+      },
+    );
     assert.equal(callback.status, 302);
     assert.equal(callback.headers.get("location"), `${config.frontendUrl}/dashboard`);
     const cookies = callback.headers.getSetCookie();
-    const sessionCookie = cookies.find((value) => value.startsWith("helpdesk_session="))?.split(";", 1)[0];
+    const sessionCookie = cookies
+      .find((value) => value.startsWith("helpdesk_session="))
+      ?.split(";", 1)[0];
     assert.ok(sessionCookie);
     assert.ok(cookies.some((value) => value.startsWith("helpdesk_microsoft_state=;")));
 
     const me = await fetch(`${baseUrl}/api/auth/me`, { headers: { cookie: sessionCookie } });
     assert.equal(me.status, 200);
     assert.deepEqual(await me.json(), { user: activeUser });
-    const logout = await fetch(`${baseUrl}/api/auth/logout`, { method: "POST", headers: { cookie: sessionCookie } });
+    const logout = await fetch(`${baseUrl}/api/auth/logout`, {
+      method: "POST",
+      headers: { cookie: sessionCookie },
+    });
     assert.equal(logout.status, 204);
     assert.match(logout.headers.get("set-cookie") ?? "", /helpdesk_session=;/);
   });
@@ -112,10 +128,13 @@ describe("Microsoft application authentication", () => {
   it("rejects a mismatched state without exchanging a code", async () => {
     const stateCookie = await begin();
     const before = exchangeCount;
-    const callback = await fetch(`${baseUrl}/api/auth/microsoft/callback?code=valid-code&state=wrong-state`, {
-      headers: { cookie: stateCookie },
-      redirect: "manual",
-    });
+    const callback = await fetch(
+      `${baseUrl}/api/auth/microsoft/callback?code=valid-code&state=wrong-state`,
+      {
+        headers: { cookie: stateCookie },
+        redirect: "manual",
+      },
+    );
     assert.equal(callback.status, 302);
     assert.match(callback.headers.get("location") ?? "", /authError=INVALID_OAUTH_STATE/);
     assert.equal(exchangeCount, before);
@@ -124,12 +143,17 @@ describe("Microsoft application authentication", () => {
   it("does not issue a session for an inactive HelpDesk user", async () => {
     inactive = true;
     const stateCookie = await begin();
-    const callback = await fetch(`${baseUrl}/api/auth/microsoft/callback?code=valid-code&state=${encodeURIComponent(issuedState)}`, {
-      headers: { cookie: stateCookie },
-      redirect: "manual",
-    });
+    const callback = await fetch(
+      `${baseUrl}/api/auth/microsoft/callback?code=valid-code&state=${encodeURIComponent(issuedState)}`,
+      {
+        headers: { cookie: stateCookie },
+        redirect: "manual",
+      },
+    );
     inactive = false;
     assert.match(callback.headers.get("location") ?? "", /authError=ACCOUNT_INACTIVE/);
-    assert.ok(!callback.headers.getSetCookie().some((value) => value.startsWith("helpdesk_session=")));
+    assert.ok(
+      !callback.headers.getSetCookie().some((value) => value.startsWith("helpdesk_session=")),
+    );
   });
 });

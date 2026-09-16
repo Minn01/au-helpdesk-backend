@@ -9,12 +9,15 @@ import {
 } from "../validation/ticket.validation.js";
 
 const userId = (request: Parameters<RequestHandler>[0]) => request.user!.id;
-const ticketId = (request: Parameters<RequestHandler>[0]) => parseUuid(request.params.ticketId, "ticketId");
+const ticketId = (request: Parameters<RequestHandler>[0]) =>
+  parseUuid(request.params.ticketId, "ticketId");
 
 export const createTicketController = (tickets: TicketApi) => ({
   listMine: (async (request, response, next) => {
     try {
-      response.status(200).json(await tickets.listMine(userId(request), parseMineQuery(request.query)));
+      response
+        .status(200)
+        .json(await tickets.listMine(userId(request), parseMineQuery(request.query)));
     } catch (error) {
       next(error);
     }
@@ -22,7 +25,9 @@ export const createTicketController = (tickets: TicketApi) => ({
 
   getOne: (async (request, response, next) => {
     try {
-      response.status(200).json({ ticket: await tickets.getOwnedDetails(ticketId(request), userId(request)) });
+      response
+        .status(200)
+        .json({ ticket: await tickets.getOwnedDetails(ticketId(request), userId(request)) });
     } catch (error) {
       next(error);
     }

@@ -4,29 +4,29 @@ import type { UserRepository } from "../auth/auth.types.js";
 import { SESSION_COOKIE_NAME, type SessionService } from "../auth/session.service.js";
 import { HttpError } from "../errors/http-error.js";
 
-export const createRequireAuth = (
-  users: UserRepository,
-  sessions: SessionService,
-): RequestHandler => async (request, _response, next) => {
-  try {
-    const token = request.cookies?.[SESSION_COOKIE_NAME];
-    if (typeof token !== "string") {
-      throw new HttpError(401, "UNAUTHENTICATED", "Authentication is required");
+export const createRequireAuth =
+  (users: UserRepository, sessions: SessionService): RequestHandler =>
+  async (request, _response, next) => {
+    try {
+      const token = request.cookies?.[SESSION_COOKIE_NAME];
+      if (typeof token !== "string") {
+        throw new HttpError(401, "UNAUTHENTICATED", "Authentication is required");
+      }
+
+      const userId = sessions.verifyToken(token);
+      const user = await users.findById(userId);
+      if (!user) throw new HttpError(401, "UNAUTHENTICATED", "Authentication is required");
+      if (!user.isActive) throw new HttpError(403, "ACCOUNT_INACTIVE", "This account is inactive");
+
+      request.user = user;
+      next();
+    } catch (error) {
+      next(error);
     }
+  };
 
-    const userId = sessions.verifyToken(token);
-    const user = await users.findById(userId);
-    if (!user) throw new HttpError(401, "UNAUTHENTICATED", "Authentication is required");
-    if (!user.isActive) throw new HttpError(403, "ACCOUNT_INACTIVE", "This account is inactive");
-
-    request.user = user;
-    next();
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const requireAnyRole = (...roles: readonly UserRole[]): RequestHandler =>
+export const requireAnyRole =
+  (...roles: readonly UserRole[]): RequestHandler =>
   (request, _response, next) => {
     if (!request.user) {
       next(new HttpError(401, "UNAUTHENTICATED", "Authentication is required"));

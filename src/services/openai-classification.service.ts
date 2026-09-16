@@ -1,6 +1,10 @@
 import OpenAI from "openai";
 import { TicketPriority } from "../../generated/prisma/client.js";
-import type { ClassificationInput, ClassificationResult, ClassificationService } from "./classification.service.js";
+import type {
+  ClassificationInput,
+  ClassificationResult,
+  ClassificationService,
+} from "./classification.service.js";
 
 type ResponsesClient = {
   responses: { create(input: Record<string, unknown>): Promise<{ output_text: string }> };
@@ -9,7 +13,10 @@ type ResponsesClient = {
 const priorities = Object.values(TicketPriority);
 const summaryLimit = 240;
 
-const parseResult = (output: string, activeCategoryNames: readonly string[]): ClassificationResult => {
+const parseResult = (
+  output: string,
+  activeCategoryNames: readonly string[],
+): ClassificationResult => {
   let value: unknown;
   try {
     value = JSON.parse(output);
@@ -26,7 +33,10 @@ const parseResult = (output: string, activeCategoryNames: readonly string[]): Cl
   if (typeof record.category !== "string" || !activeCategoryNames.includes(record.category)) {
     throw new Error("OpenAI classification response contained an unavailable category");
   }
-  if (typeof record.priority !== "string" || !priorities.includes(record.priority as TicketPriority)) {
+  if (
+    typeof record.priority !== "string" ||
+    !priorities.includes(record.priority as TicketPriority)
+  ) {
     throw new Error("OpenAI classification response contained an invalid priority");
   }
   if (record.summary !== null && typeof record.summary !== "string") {
@@ -46,12 +56,18 @@ const parseResult = (output: string, activeCategoryNames: readonly string[]): Cl
 export class OpenAIClassificationService implements ClassificationService {
   private readonly client: ResponsesClient;
 
-  constructor(apiKey: string, private readonly model: string, timeoutMs: number, client?: ResponsesClient) {
+  constructor(
+    apiKey: string,
+    private readonly model: string,
+    timeoutMs: number,
+    client?: ResponsesClient,
+  ) {
     this.client = client ?? new OpenAI({ apiKey, timeout: timeoutMs, maxRetries: 0 });
   }
 
   async classify(input: ClassificationInput): Promise<ClassificationResult> {
-    if (input.activeCategoryNames.length === 0) throw new Error("No active categories are available for classification");
+    if (input.activeCategoryNames.length === 0)
+      throw new Error("No active categories are available for classification");
     const response = await this.client.responses.create({
       model: this.model,
       store: false,

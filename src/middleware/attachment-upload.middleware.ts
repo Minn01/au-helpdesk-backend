@@ -21,18 +21,32 @@ const parser = multer({
 
 export const parseAttachmentUpload: RequestHandler = (request, response, next) => {
   parser(request, response, (error) => {
-    if (!error) { next(); return; }
-    if (error instanceof HttpError) { next(error); return; }
+    if (!error) {
+      next();
+      return;
+    }
+    if (error instanceof HttpError) {
+      next(error);
+      return;
+    }
     if (error instanceof multer.MulterError) {
       if (error.code === "LIMIT_FILE_SIZE") {
         next(new HttpError(413, "FILE_TOO_LARGE", "Each attachment must be 13 MB or smaller"));
         return;
       }
       if (error.code === "LIMIT_FILE_COUNT" || error.code === "LIMIT_UNEXPECTED_FILE") {
-        next(new HttpError(400, "TOO_MANY_FILES", `Upload at most ${MAX_ATTACHMENTS_PER_REQUEST} files using the files field`));
+        next(
+          new HttpError(
+            400,
+            "TOO_MANY_FILES",
+            `Upload at most ${MAX_ATTACHMENTS_PER_REQUEST} files using the files field`,
+          ),
+        );
         return;
       }
     }
-    next(new HttpError(400, "INVALID_MULTIPART_UPLOAD", "The multipart attachment upload is invalid"));
+    next(
+      new HttpError(400, "INVALID_MULTIPART_UPLOAD", "The multipart attachment upload is invalid"),
+    );
   });
 };

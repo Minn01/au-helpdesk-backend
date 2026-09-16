@@ -8,7 +8,13 @@ import { HttpError } from "../errors/http-error.js";
 import type { MineFilters } from "./ticket.service.js";
 import { attachmentSelect } from "./attachment-select.js";
 
-const userSelect = { id: true, email: true, displayName: true, role: true, isActive: true } as const;
+const userSelect = {
+  id: true,
+  email: true,
+  displayName: true,
+  role: true,
+  isActive: true,
+} as const;
 const categorySelect = { id: true, name: true, description: true, isActive: true } as const;
 const listSelect = {
   id: true,
@@ -39,7 +45,10 @@ const detailInclude = {
     orderBy: { assignedAt: "asc" as const },
     include: { technician: { select: userSelect }, assignedBy: { select: userSelect } },
   },
-  activities: { orderBy: { createdAt: "asc" as const }, include: { actor: { select: userSelect } } },
+  activities: {
+    orderBy: { createdAt: "asc" as const },
+    include: { actor: { select: userSelect } },
+  },
 } as const;
 
 export type AdminTicketFilters = MineFilters & { assignedTechnicianId?: string | undefined };
@@ -52,15 +61,21 @@ export class AdminTicketService {
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.priority ? { priority: filters.priority } : {}),
       ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
-      ...(filters.assignedTechnicianId ? { assignedTechnicianId: filters.assignedTechnicianId } : {}),
-      ...(filters.search ? {
-        OR: [
-          { ticketNumber: { contains: filters.search, mode: "insensitive" } },
-          { title: { contains: filters.search, mode: "insensitive" } },
-          { description: { contains: filters.search, mode: "insensitive" } },
-          { creator: { is: { displayName: { contains: filters.search, mode: "insensitive" } } } },
-        ],
-      } : {}),
+      ...(filters.assignedTechnicianId
+        ? { assignedTechnicianId: filters.assignedTechnicianId }
+        : {}),
+      ...(filters.search
+        ? {
+            OR: [
+              { ticketNumber: { contains: filters.search, mode: "insensitive" } },
+              { title: { contains: filters.search, mode: "insensitive" } },
+              { description: { contains: filters.search, mode: "insensitive" } },
+              {
+                creator: { is: { displayName: { contains: filters.search, mode: "insensitive" } } },
+              },
+            ],
+          }
+        : {}),
     };
     return this.database.$transaction(async (transaction) => {
       const tickets = await transaction.ticket.findMany({
@@ -116,14 +131,22 @@ export class AdminTicketService {
       });
       if (!current) throw new HttpError(404, "TICKET_NOT_FOUND", "Ticket not found");
       if (
-        current.status === TicketStatus.RESOLVED
-        || current.status === TicketStatus.CLOSED
-        || current.status === TicketStatus.CANCELLED
+        current.status === TicketStatus.RESOLVED ||
+        current.status === TicketStatus.CLOSED ||
+        current.status === TicketStatus.CANCELLED
       ) {
-        throw new HttpError(409, "TICKET_NOT_ASSIGNABLE", "Completed or cancelled tickets cannot be assigned");
+        throw new HttpError(
+          409,
+          "TICKET_NOT_ASSIGNABLE",
+          "Completed or cancelled tickets cannot be assigned",
+        );
       }
       if (current.assignedTechnicianId === technicianId) {
-        throw new HttpError(409, "TICKET_ALREADY_ASSIGNED", "Ticket is already assigned to this technician");
+        throw new HttpError(
+          409,
+          "TICKET_ALREADY_ASSIGNED",
+          "Ticket is already assigned to this technician",
+        );
       }
 
       const updated = await transaction.ticket.updateMany({
@@ -138,7 +161,11 @@ export class AdminTicketService {
         },
       });
       if (updated.count !== 1) {
-        throw new HttpError(409, "ASSIGNMENT_CONFLICT", "Ticket assignment changed; refresh and try again");
+        throw new HttpError(
+          409,
+          "ASSIGNMENT_CONFLICT",
+          "Ticket assignment changed; refresh and try again",
+        );
       }
 
       const changedAt = new Date();
@@ -148,7 +175,11 @@ export class AdminTicketService {
           data: { unassignedAt: changedAt },
         });
         if (ended.count !== 1) {
-          throw new HttpError(409, "ASSIGNMENT_HISTORY_CONFLICT", "Current assignment history is inconsistent");
+          throw new HttpError(
+            409,
+            "ASSIGNMENT_HISTORY_CONFLICT",
+            "Current assignment history is inconsistent",
+          );
         }
       }
       await transaction.ticketAssignment.create({
@@ -159,7 +190,9 @@ export class AdminTicketService {
           ticketId,
           actorId: adminId,
           type: current.assignedTechnicianId ? "TICKET_REASSIGNED" : "TICKET_ASSIGNED",
-          message: current.assignedTechnicianId ? "Ticket reassigned by administrator" : "Ticket assigned by administrator",
+          message: current.assignedTechnicianId
+            ? "Ticket reassigned by administrator"
+            : "Ticket assigned by administrator",
           metadata: {
             previousTechnicianId: current.assignedTechnicianId,
             technicianId,
@@ -168,14 +201,23 @@ export class AdminTicketService {
           },
         },
       });
-      return transaction.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: detailInclude });
+      return transaction.ticket.findUniqueOrThrow({
+        where: { id: ticketId },
+        include: detailInclude,
+      });
     });
   }
 
   private async assertExists(ticketId: string) {
-    const ticket = await this.database.ticket.findUnique({ where: { id: ticketId }, select: { id: true } });
+    const ticket = await this.database.ticket.findUnique({
+      where: { id: ticketId },
+      select: { id: true },
+    });
     if (!ticket) throw new HttpError(404, "TICKET_NOT_FOUND", "Ticket not found");
   }
 }
 
-export type AdminTicketApi = Pick<AdminTicketService, "listAll" | "getDetails" | "listComments" | "assign">;
+export type AdminTicketApi = Pick<
+  AdminTicketService,
+  "listAll" | "getDetails" | "listComments" | "assign"
+>;

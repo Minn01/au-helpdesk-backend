@@ -13,7 +13,9 @@ export const createCategoryRouter = (
 ) => {
   const router = Router();
   router.use(createRequireAuth(users, sessions));
-  router.use(requireAnyRole(UserRole.STUDENT, UserRole.FACULTY, UserRole.TECHNICIAN, UserRole.ADMIN));
+  router.use(
+    requireAnyRole(UserRole.STUDENT, UserRole.FACULTY, UserRole.TECHNICIAN, UserRole.ADMIN),
+  );
   router.get("/", createListCategories(categories));
   return router;
 };

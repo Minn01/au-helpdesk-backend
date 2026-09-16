@@ -15,5 +15,6 @@ export const technicianTicketRelevanceWhere = (technicianId: string): Prisma.Tic
 export const isTicketRelevantToTechnician = (
   ticket: TechnicianTicketSnapshot,
   technicianId: string,
-): boolean => ticket.assignedTechnicianId === technicianId
-  || (ticket.status === TicketStatus.OPEN && ticket.assignedTechnicianId === null);
+): boolean =>
+  ticket.assignedTechnicianId === technicianId ||
+  (ticket.status === TicketStatus.OPEN && ticket.assignedTechnicianId === null);

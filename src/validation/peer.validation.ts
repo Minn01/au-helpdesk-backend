@@ -18,13 +18,20 @@ export const parseEduCoreTicket = (value: unknown): EduCoreTicketInput => {
     return validationError("eventId contains unsupported characters");
   }
   const email = parseString(student.email, "student.email", { min: 3, max: 254 }).toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return validationError("student.email must be a valid email address");
-  const courseCode = parseString(course.courseCode, "course.courseCode", { min: 2, max: 30 }).toUpperCase();
-  if (!/^[A-Z0-9][A-Z0-9 -]*$/.test(courseCode)) return validationError("course.courseCode is invalid");
-  if (body.registrationStatus !== "FAILED") return validationError("registrationStatus must be FAILED");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return validationError("student.email must be a valid email address");
+  const courseCode = parseString(course.courseCode, "course.courseCode", {
+    min: 2,
+    max: 30,
+  }).toUpperCase();
+  if (!/^[A-Z0-9][A-Z0-9 -]*$/.test(courseCode))
+    return validationError("course.courseCode is invalid");
+  if (body.registrationStatus !== "FAILED")
+    return validationError("registrationStatus must be FAILED");
   const rawOccurredAt = parseString(body.occurredAt, "occurredAt", { min: 20, max: 40 });
   const occurredAt = new Date(rawOccurredAt);
-  if (Number.isNaN(occurredAt.getTime())) return validationError("occurredAt must be a valid ISO-8601 timestamp");
+  if (Number.isNaN(occurredAt.getTime()))
+    return validationError("occurredAt must be a valid ISO-8601 timestamp");
   return {
     eventId,
     student: {
@@ -54,17 +61,25 @@ export const parseEduCoreContext = (value: unknown): EduCoreRegistrationContext 
   const body = assertObject(value);
   const attemptedAtValue = parseString(body.attemptedAt, "attemptedAt", { min: 20, max: 40 });
   const attemptedAt = new Date(attemptedAtValue);
-  if (Number.isNaN(attemptedAt.getTime())) return validationError("attemptedAt must be a valid ISO-8601 timestamp");
+  if (Number.isNaN(attemptedAt.getTime()))
+    return validationError("attemptedAt must be a valid ISO-8601 timestamp");
   const additional = body.additionalContext;
-  if (additional !== undefined && additional !== null && (typeof additional !== "object" || Array.isArray(additional))) {
+  if (
+    additional !== undefined &&
+    additional !== null &&
+    (typeof additional !== "object" || Array.isArray(additional))
+  ) {
     return validationError("additionalContext must be an object or null");
   }
   return {
     studentId: parseOptionalString(body.studentId, "studentId", 128) ?? null,
     courseCode: parseString(body.courseCode, "courseCode", { min: 2, max: 30 }).toUpperCase(),
-    registrationStatus: parseString(body.registrationStatus, "registrationStatus", { min: 1, max: 40 }),
+    registrationStatus: parseString(body.registrationStatus, "registrationStatus", {
+      min: 1,
+      max: 40,
+    }),
     failureReason: parseOptionalString(body.failureReason, "failureReason", 1_000) ?? null,
     attemptedAt: attemptedAt.toISOString(),
-    additionalContext: additional ? additional as Record<string, unknown> : null,
+    additionalContext: additional ? (additional as Record<string, unknown>) : null,
   };
 };

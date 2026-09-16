@@ -39,14 +39,29 @@ export const createApp = (dependencies: AppDependencies) => {
 
   app.disable("x-powered-by");
   app.set("json replacer", (_key: string, value: unknown) =>
-    typeof value === "bigint" ? value.toString() : value);
+    typeof value === "bigint" ? value.toString() : value,
+  );
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
   app.use("/api/health", healthRouter);
-  app.use("/api/auth", createAuthRouter(dependencies.users, dependencies.sessions, isProduction, dependencies.microsoft));
-  app.use("/api/categories", createCategoryRouter(dependencies.users, dependencies.sessions, dependencies.categories));
+  app.use(
+    "/api/auth",
+    createAuthRouter(
+      dependencies.users,
+      dependencies.sessions,
+      isProduction,
+      dependencies.microsoft,
+    ),
+  );
+  app.use(
+    "/api/categories",
+    createCategoryRouter(dependencies.users, dependencies.sessions, dependencies.categories),
+  );
   if (dependencies.peer) {
-    app.use("/api/integrations", createPeerRouter(dependencies.peer.apiKey, dependencies.peer.tickets));
+    app.use(
+      "/api/integrations",
+      createPeerRouter(dependencies.peer.apiKey, dependencies.peer.tickets),
+    );
   }
   app.use(
     "/api/admin",

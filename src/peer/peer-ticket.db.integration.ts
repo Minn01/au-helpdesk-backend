@@ -2,7 +2,12 @@ import "dotenv/config";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
-import { PeerSourceSystem, TicketPriority, TicketStatus, UserRole } from "../../generated/prisma/client.js";
+import {
+  PeerSourceSystem,
+  TicketPriority,
+  TicketStatus,
+  UserRole,
+} from "../../generated/prisma/client.js";
 import { createPrismaClient } from "../lib/prisma.js";
 import { PeerTicketService } from "../services/peer-integrations/peer-ticket.service.js";
 
@@ -18,12 +23,22 @@ let createdCategoryId: string | undefined;
 describe("EduCore peer ticket persistence", () => {
   before(async () => {
     await firstDatabase.user.create({
-      data: { id: studentId, email: studentEmail, displayName: "Peer Test Student", role: UserRole.STUDENT },
+      data: {
+        id: studentId,
+        email: studentEmail,
+        displayName: "Peer Test Student",
+        role: UserRole.STUDENT,
+      },
     });
-    const category = await firstDatabase.category.findUnique({ where: { name: "Course Registration" } });
+    const category = await firstDatabase.category.findUnique({
+      where: { name: "Course Registration" },
+    });
     if (!category) {
       const created = await firstDatabase.category.create({
-        data: { name: "Course Registration", description: "Temporary peer integration-test category" },
+        data: {
+          name: "Course Registration",
+          description: "Temporary peer integration-test category",
+        },
       });
       createdCategoryId = created.id;
     } else if (!category.isActive) {
@@ -34,7 +49,8 @@ describe("EduCore peer ticket persistence", () => {
   after(async () => {
     await firstDatabase.ticket.deleteMany({ where: { id: { in: createdTicketIds } } });
     await firstDatabase.user.deleteMany({ where: { id: studentId } });
-    if (createdCategoryId) await firstDatabase.category.deleteMany({ where: { id: createdCategoryId } });
+    if (createdCategoryId)
+      await firstDatabase.category.deleteMany({ where: { id: createdCategoryId } });
     await Promise.all([firstDatabase.$disconnect(), secondDatabase.$disconnect()]);
   });
 
@@ -70,6 +86,9 @@ describe("EduCore peer ticket persistence", () => {
     assert.equal(ticket.category.name, "Course Registration");
     assert.equal(ticket.peerReferences.length, 1);
     assert.equal(ticket.peerReferences[0]?.sourceSystem, PeerSourceSystem.EDUCORE);
-    assert.equal(ticket.activities.filter((activity) => activity.type === "PEER_TICKET_CREATED").length, 1);
+    assert.equal(
+      ticket.activities.filter((activity) => activity.type === "PEER_TICKET_CREATED").length,
+      1,
+    );
   });
 });

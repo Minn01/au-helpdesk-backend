@@ -20,10 +20,18 @@ type Database = PrismaClient | Prisma.TransactionClient;
 type UploadFile = ReturnType<typeof validateAttachmentFile> & { storagePath: string };
 
 export class AttachmentService {
-  constructor(private readonly database: PrismaClient, private readonly storage: StorageService) {}
+  constructor(
+    private readonly database: PrismaClient,
+    private readonly storage: StorageService,
+  ) {}
 
   async upload(ticketId: string, actor: AuthUser, files: Express.Multer.File[]) {
-    if (files.length === 0) throw new HttpError(400, "ATTACHMENT_REQUIRED", "Provide at least one file in the files field");
+    if (files.length === 0)
+      throw new HttpError(
+        400,
+        "ATTACHMENT_REQUIRED",
+        "Provide at least one file in the files field",
+      );
     await this.assertUploadAccess(this.database, ticketId, actor);
     const prepared: UploadFile[] = files.map((file) => {
       const validated = validateAttachmentFile(file);
@@ -35,12 +43,19 @@ export class AttachmentService {
     const uploaded: UploadFile[] = [];
     try {
       for (const file of prepared) {
-        await this.storage.upload(file.storagePath, { body: file.body, contentType: file.mimeType });
+        await this.storage.upload(file.storagePath, {
+          body: file.body,
+          contentType: file.mimeType,
+        });
         uploaded.push(file);
       }
     } catch (error) {
       await this.cleanupUploaded(uploaded, ticketId, actor.id);
-      throw new HttpError(502, "ATTACHMENT_UPLOAD_FAILED", "Attachment storage is temporarily unavailable");
+      throw new HttpError(
+        502,
+        "ATTACHMENT_UPLOAD_FAILED",
+        "Attachment storage is temporarily unavailable",
+      );
     }
 
     try {
@@ -75,8 +90,16 @@ export class AttachmentService {
     } catch (error) {
       await this.cleanupUploaded(uploaded, ticketId, actor.id);
       if (error instanceof HttpError) throw error;
-      logger.error("Attachment metadata creation failed", { ticketId, actorId: actor.id, fileCount: prepared.length });
-      throw new HttpError(500, "ATTACHMENT_UPLOAD_FAILED", "Attachment metadata could not be saved");
+      logger.error("Attachment metadata creation failed", {
+        ticketId,
+        actorId: actor.id,
+        fileCount: prepared.length,
+      });
+      throw new HttpError(
+        500,
+        "ATTACHMENT_UPLOAD_FAILED",
+        "Attachment metadata could not be saved",
+      );
     }
   }
 
@@ -88,11 +111,21 @@ export class AttachmentService {
     });
     if (!attachment) throw new HttpError(404, "ATTACHMENT_NOT_FOUND", "Attachment not found");
     try {
-      const url = await this.storage.createSignedUrl(attachment.storagePath, signedUrlLifetimeSeconds);
-      return { url, expiresAt: new Date(Date.now() + signedUrlLifetimeSeconds * 1_000).toISOString() };
+      const url = await this.storage.createSignedUrl(
+        attachment.storagePath,
+        signedUrlLifetimeSeconds,
+      );
+      return {
+        url,
+        expiresAt: new Date(Date.now() + signedUrlLifetimeSeconds * 1_000).toISOString(),
+      };
     } catch {
       logger.warn("Attachment signed URL creation failed", { ticketId, attachmentId });
-      throw new HttpError(502, "ATTACHMENT_RETRIEVAL_FAILED", "Attachment storage is temporarily unavailable");
+      throw new HttpError(
+        502,
+        "ATTACHMENT_RETRIEVAL_FAILED",
+        "Attachment storage is temporarily unavailable",
+      );
     }
   }
 
@@ -103,15 +136,26 @@ export class AttachmentService {
       backup = await this.storage.download(attachment.storagePath);
       await this.storage.remove(attachment.storagePath);
     } catch {
-      logger.warn("Attachment storage removal failed", { ticketId, attachmentId, actorId: actor.id });
-      throw new HttpError(502, "ATTACHMENT_DELETE_FAILED", "Attachment storage is temporarily unavailable");
+      logger.warn("Attachment storage removal failed", {
+        ticketId,
+        attachmentId,
+        actorId: actor.id,
+      });
+      throw new HttpError(
+        502,
+        "ATTACHMENT_DELETE_FAILED",
+        "Attachment storage is temporarily unavailable",
+      );
     }
 
     try {
       await this.database.$transaction(async (transaction) => {
         await this.assertRemovalAccess(transaction, ticketId, actor, attachment.uploadedById);
-        const deleted = await transaction.attachment.deleteMany({ where: { id: attachmentId, ticketId } });
-        if (deleted.count !== 1) throw new HttpError(404, "ATTACHMENT_NOT_FOUND", "Attachment not found");
+        const deleted = await transaction.attachment.deleteMany({
+          where: { id: attachmentId, ticketId },
+        });
+        if (deleted.count !== 1)
+          throw new HttpError(404, "ATTACHMENT_NOT_FOUND", "Attachment not found");
         await transaction.ticketActivity.create({
           data: {
             ticketId,
@@ -124,13 +168,28 @@ export class AttachmentService {
       });
     } catch (error) {
       try {
-        await this.storage.upload(attachment.storagePath, { ...backup, contentType: attachment.mimeType });
+        await this.storage.upload(attachment.storagePath, {
+          ...backup,
+          contentType: attachment.mimeType,
+        });
       } catch {
-        logger.error("Attachment restoration failed after database error", { ticketId, attachmentId, actorId: actor.id });
+        logger.error("Attachment restoration failed after database error", {
+          ticketId,
+          attachmentId,
+          actorId: actor.id,
+        });
       }
       if (error instanceof HttpError) throw error;
-      logger.error("Attachment metadata removal failed", { ticketId, attachmentId, actorId: actor.id });
-      throw new HttpError(500, "ATTACHMENT_DELETE_FAILED", "Attachment metadata could not be removed");
+      logger.error("Attachment metadata removal failed", {
+        ticketId,
+        attachmentId,
+        actorId: actor.id,
+      });
+      throw new HttpError(
+        500,
+        "ATTACHMENT_DELETE_FAILED",
+        "Attachment metadata could not be removed",
+      );
     }
   }
 
@@ -140,13 +199,19 @@ export class AttachmentService {
       select: { creatorId: true, assignedTechnicianId: true, status: true },
     });
     if (!ticket) throw new HttpError(404, "TICKET_NOT_FOUND", "Ticket not found");
-    const active = activeStatuses.includes(ticket.status as typeof activeStatuses[number]);
-    const allowed = actor.role === UserRole.ADMIN
-      ? active
-      : actor.role === UserRole.TECHNICIAN
-        ? ticket.assignedTechnicianId === actor.id && active
-        : ticket.creatorId === actor.id && active;
-    if (!allowed) throw new HttpError(403, "ATTACHMENT_ACCESS_DENIED", "You cannot upload attachments to this ticket");
+    const active = activeStatuses.includes(ticket.status as (typeof activeStatuses)[number]);
+    const allowed =
+      actor.role === UserRole.ADMIN
+        ? active
+        : actor.role === UserRole.TECHNICIAN
+          ? ticket.assignedTechnicianId === actor.id && active
+          : ticket.creatorId === actor.id && active;
+    if (!allowed)
+      throw new HttpError(
+        403,
+        "ATTACHMENT_ACCESS_DENIED",
+        "You cannot upload attachments to this ticket",
+      );
   }
 
   private async assertViewAccess(ticketId: string, actor: AuthUser) {
@@ -155,11 +220,17 @@ export class AttachmentService {
       select: { creatorId: true, assignedTechnicianId: true, status: true },
     });
     if (!ticket) throw new HttpError(404, "TICKET_NOT_FOUND", "Ticket not found");
-    const allowed = actor.role === UserRole.ADMIN
-      || (actor.role === UserRole.TECHNICIAN
+    const allowed =
+      actor.role === UserRole.ADMIN ||
+      (actor.role === UserRole.TECHNICIAN
         ? isTicketRelevantToTechnician(ticket, actor.id)
         : ticket.creatorId === actor.id);
-    if (!allowed) throw new HttpError(403, "ATTACHMENT_ACCESS_DENIED", "You cannot view attachments for this ticket");
+    if (!allowed)
+      throw new HttpError(
+        403,
+        "ATTACHMENT_ACCESS_DENIED",
+        "You cannot view attachments for this ticket",
+      );
   }
 
   private async findAttachmentForRemoval(ticketId: string, attachmentId: string, actor: AuthUser) {
@@ -168,7 +239,10 @@ export class AttachmentService {
       select: { id: true, fileName: true, storagePath: true, mimeType: true, uploadedById: true },
     });
     if (!attachment) {
-      const ticket = await this.database.ticket.findUnique({ where: { id: ticketId }, select: { id: true } });
+      const ticket = await this.database.ticket.findUnique({
+        where: { id: ticketId },
+        select: { id: true },
+      });
       if (!ticket) throw new HttpError(404, "TICKET_NOT_FOUND", "Ticket not found");
       throw new HttpError(404, "ATTACHMENT_NOT_FOUND", "Attachment not found");
     }
@@ -176,23 +250,40 @@ export class AttachmentService {
     return attachment;
   }
 
-  private async assertRemovalAccess(database: Database, ticketId: string, actor: AuthUser, uploadedById: string) {
+  private async assertRemovalAccess(
+    database: Database,
+    ticketId: string,
+    actor: AuthUser,
+    uploadedById: string,
+  ) {
     const ticket = await database.ticket.findUnique({
       where: { id: ticketId },
       select: { creatorId: true, assignedTechnicianId: true, status: true },
     });
     if (!ticket) throw new HttpError(404, "TICKET_NOT_FOUND", "Ticket not found");
-    const allowed = actor.role === UserRole.ADMIN
-      || (actor.role === UserRole.TECHNICIAN
-        ? ticket.assignedTechnicianId === actor.id && uploadedById === actor.id && activeStatuses.includes(ticket.status as typeof activeStatuses[number])
-        : ticket.creatorId === actor.id && uploadedById === actor.id && ticket.status === TicketStatus.OPEN);
-    if (!allowed) throw new HttpError(403, "ATTACHMENT_ACCESS_DENIED", "You cannot remove this attachment");
+    const allowed =
+      actor.role === UserRole.ADMIN ||
+      (actor.role === UserRole.TECHNICIAN
+        ? ticket.assignedTechnicianId === actor.id &&
+          uploadedById === actor.id &&
+          activeStatuses.includes(ticket.status as (typeof activeStatuses)[number])
+        : ticket.creatorId === actor.id &&
+          uploadedById === actor.id &&
+          ticket.status === TicketStatus.OPEN);
+    if (!allowed)
+      throw new HttpError(403, "ATTACHMENT_ACCESS_DENIED", "You cannot remove this attachment");
   }
 
   private async cleanupUploaded(files: UploadFile[], ticketId: string, actorId: string) {
-    const results = await Promise.allSettled(files.map((file) => this.storage.remove(file.storagePath)));
+    const results = await Promise.allSettled(
+      files.map((file) => this.storage.remove(file.storagePath)),
+    );
     if (results.some((result) => result.status === "rejected")) {
-      logger.error("Attachment upload cleanup was incomplete", { ticketId, actorId, fileCount: files.length });
+      logger.error("Attachment upload cleanup was incomplete", {
+        ticketId,
+        actorId,
+        fileCount: files.length,
+      });
     }
   }
 }

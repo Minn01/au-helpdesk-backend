@@ -1,5 +1,11 @@
 import { UserRole } from "../../generated/prisma/client.js";
-import { assertObject, parseOptionalString, parseString, parseUuid, validationError } from "./common.js";
+import {
+  assertObject,
+  parseOptionalString,
+  parseString,
+  parseUuid,
+  validationError,
+} from "./common.js";
 import { parseMineQuery } from "./ticket.validation.js";
 
 const oneQueryValue = (value: unknown, field: string): string | undefined => {
@@ -10,9 +16,13 @@ const oneQueryValue = (value: unknown, field: string): string | undefined => {
 
 export const parseAdminTicketQuery = (query: Record<string, unknown>) => ({
   ...parseMineQuery(query),
-  assignedTechnicianId: query.assignedTechnicianId === undefined
-    ? undefined
-    : parseUuid(oneQueryValue(query.assignedTechnicianId, "assignedTechnicianId"), "assignedTechnicianId"),
+  assignedTechnicianId:
+    query.assignedTechnicianId === undefined
+      ? undefined
+      : parseUuid(
+          oneQueryValue(query.assignedTechnicianId, "assignedTechnicianId"),
+          "assignedTechnicianId",
+        ),
 });
 
 export const parseAssignment = (value: unknown) => {
@@ -49,9 +59,11 @@ export const parseUpdateCategory = (value: unknown) => {
 
 export const parseUserQuery = (query: Record<string, unknown>) => {
   const search = oneQueryValue(query.search, "search")?.trim();
-  if (search && search.length > 200) return validationError("search must be at most 200 characters");
+  if (search && search.length > 200)
+    return validationError("search must be at most 200 characters");
   const role = oneQueryValue(query.role, "role");
-  if (role && !Object.values(UserRole).includes(role as UserRole)) return validationError("role is invalid");
+  if (role && !Object.values(UserRole).includes(role as UserRole))
+    return validationError("role is invalid");
   const active = oneQueryValue(query.active, "active");
   if (active !== undefined && active !== "true" && active !== "false") {
     return validationError("active must be true or false");
@@ -78,6 +90,7 @@ export const parseUserUpdate = (value: unknown) => {
   if (body.isActive !== undefined && typeof body.isActive !== "boolean") {
     return validationError("isActive must be a boolean");
   }
-  if (role === undefined && body.isActive === undefined) return validationError("role or isActive is required");
+  if (role === undefined && body.isActive === undefined)
+    return validationError("role or isActive is required");
   return { role, isActive: body.isActive as boolean | undefined };
 };
